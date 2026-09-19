@@ -1,0 +1,54 @@
+# ==============================================================================
+# School Examination Marks and Report Card Management System
+# Git Ignore Rules
+# ==============================================================================
+
+# Dependencies
+/node_modules
+/vendor
+
+# Compiled Asset Artifacts
+/public/build
+/public/hot
+/public/storage
+
+# Environment & Secret Files (CRITICAL SECURITY)
+.env
+.env.backup
+.env.production
+.env.staging
+.env.local
+.env.*.local
+.env.*
+!.env.example
+
+# Laravel Runtime Storage & Private Reports
+/storage/*.key
+/storage/app/private/reports/*
+!/storage/app/private/reports/.gitignore
+/storage/app/private/temp/*
+!/storage/app/private/temp/.gitignore
+/storage/framework/cache/*
+/storage/framework/sessions/*
+/storage/framework/testing/*
+/storage/framework/views/*
+/storage/logs/*
+
+# Local Testing & IDE Artifacts
+.phpunit.result.cache
+.pest/
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS & Temporary Metadata
+.DS_Store
+Thumbs.db
+ehthumbs.db
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

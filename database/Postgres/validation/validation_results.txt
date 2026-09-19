@@ -1,0 +1,180 @@
+﻿=============================================================================
+Starting School Report Card PostgreSQL Validation Master Suite
+=============================================================================
+
+-----------------------------------------------------------------------------
+1. Executing Schema and Core Integrity Validation (40 Scenarios + Extensions)
+-----------------------------------------------------------------------------
+DROP TABLE
+CREATE TABLE
+CREATE FUNCTION
+CREATE FUNCTION
+DO
+ test_id | scenario_no |                scenario_name                 |    enforcement    |           test_type           |          status           |                                                                     details                                                                      
+---------+-------------+----------------------------------------------+-------------------+-------------------------------+---------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------
+       1 |           1 | Academic hierarchy                           | DB-ENFORCED       | POSITIVE                      | PASS                      | Created Academic Year 2026/27, Terms 1 & 2, Class 8 & 9, Sections 8A, 8B, 9A
+       2 |           1 | Academic hierarchy (term seq unique)         | DB-ENFORCED       | NEGATIVE (EXPECTED REJECTION) | PASS (EXPECTED REJECTION) | Correctly rejected by PostgreSQL (SQLSTATE 23505 matches expected 23505): duplicate key value violates unique constraint "uk_terms_year_seq"
+       3 |           2 | Student placement                            | DB-ENFORCED       | POSITIVE                      | PASS                      | Created student John Kumar with placement in 8A, Roll 15, status active
+       4 |           3 | Internal transfer                            | BOTH              | POSITIVE                      | PASS                      | Transferred John Kumar to 8B: 8A marked internal_transfer, 8B active from 2026-08-01
+       5 |           4 | Historical roll number                       | DB-ENFORCED       | POSITIVE                      | PASS                      | Historical 8A Roll 15 preserved; current 8B Roll 22 established
+       6 |           4 | Historical roll number uniqueness            | DB-ENFORCED       | NEGATIVE (EXPECTED REJECTION) | PASS (EXPECTED REJECTION) | Correctly rejected by PostgreSQL (SQLSTATE 23505 matches expected 23505): duplicate key value violates unique constraint "uk_sar_year_class_sect
+       7 |           5 | Student-specific subject allocation          | DB-ENFORCED       | POSITIVE                      | PASS                      | Allocated 3 main subjects (Math, English, Science) to John Kumar
+       8 |           6 | Elective allocation                          | DB-ENFORCED       | POSITIVE                      | PASS                      | Allocated electives CS and PE; unallocated elective Economics correctly excluded
+       9 |           7 | Subject name snapshot                        | DB-ENFORCED       | POSITIVE                      | PASS                      | All 6 class_subjects rows have immutable subject_name_snapshot populated
+      10 |           8 | Assessment type + assessment                 | DB-ENFORCED       | POSITIVE                      | PASS                      | Created Assessment Types (Unit Test, Term Exam) and Assessments (Unit Test 1, Term 1 Exam)
+      11 |           9 | Assessment applicability                     | DB-ENFORCED       | POSITIVE                      | PASS                      | Configured assessment applicability linking Unit Test 1 to 8B subjects with maximum marks
+      12 |          10 | Different maximum marks per subject          | DB-ENFORCED       | POSITIVE                      | PASS                      | Confirmed Math=20.00, English=25.00, Science=30.00 for Unit Test 1
+      13 |          10 | Assessment applicability max_marks > 0       | DB-ENFORCED       | NEGATIVE (EXPECTED REJECTION) | PASS (EXPECTED REJECTION) | Correctly rejected by PostgreSQL (SQLSTATE 23514 matches expected 23514): new row for relation "assessment_applicability" violates check constra
+      14 |          11 | Blank mark                                   | DB-ENFORCED       | POSITIVE                      | PASS                      | Inserted blank mark: result_status=blank, mark_value=NULL (incomplete)
+      15 |          12 | Numeric zero                                 | DB-ENFORCED       | POSITIVE                      | PASS                      | Inserted numeric zero: result_status=numeric, mark_value=0.00 (completed)
+      16 |          13 | Numeric decimal                              | DB-ENFORCED       | POSITIVE                      | PASS                      | Updated Math mark to decimal: result_status=numeric, mark_value=17.50
+      17 |          14 | Numeric positive mark                        | DB-ENFORCED       | POSITIVE                      | PASS                      | Inserted numeric positive mark: result_status=numeric, mark_value=25.00
+      18 |          15 | Absent/A                                     | DB-ENFORCED       | POSITIVE                      | PASS                      | Inserted absent mark: result_status=absent, mark_value=NULL (contributes 0, completed)
+      19 |          16 | Invalid negative mark rejection              | DB-ENFORCED       | NEGATIVE (EXPECTED REJECTION) | PASS (EXPECTED REJECTION) | Correctly rejected by PostgreSQL (SQLSTATE 23514 matches expected 23514): new row for relation "marks" violates check constraint "chk_marks_resu
+      20 |          17 | Invalid mark > maximum rejection             | APPLICATION-LEVEL | INVARIANT DEMO                | PASS                      | Application-level invariant: 0 <= mark_value <= maximum_marks must be validated by service layer before insert/update
+      21 |          18 | Invalid state: numeric with NULL             | DB-ENFORCED       | NEGATIVE (EXPECTED REJECTION) | PASS (EXPECTED REJECTION) | Correctly rejected by PostgreSQL (SQLSTATE 23514 matches expected 23514): new row for relation "marks" violates check constraint "chk_marks_resu
+      22 |          18 | Invalid state: blank with numeric value      | DB-ENFORCED       | NEGATIVE (EXPECTED REJECTION) | PASS (EXPECTED REJECTION) | Correctly rejected by PostgreSQL (SQLSTATE 23514 matches expected 23514): new row for relation "marks" violates check constraint "chk_marks_resu
+      23 |          18 | Invalid state: absent with numeric value     | DB-ENFORCED       | NEGATIVE (EXPECTED REJECTION) | PASS (EXPECTED REJECTION) | Correctly rejected by PostgreSQL (SQLSTATE 23514 matches expected 23514): new row for relation "marks" violates check constraint "chk_marks_resu
+      24 |          19 | Attendance valid case                        | DB-ENFORCED       | POSITIVE                      | PASS                      | Inserted attendance: 45/50 days (90.00%) for Term 1
+      25 |          20 | Attendance 0/0                               | BOTH              | POSITIVE                      | PASS                      | Inserted 0/0 days attended: valid in DB; application layer displays N/A to prevent divide-by-zero
+      26 |          21 | Attendance > working days rejection          | DB-ENFORCED       | NEGATIVE (EXPECTED REJECTION) | PASS (EXPECTED REJECTION) | Correctly rejected by PostgreSQL (SQLSTATE 23514 matches expected 23514): new row for relation "attendance" violates check constraint "chk_atten
+      27 |          22 | Multiple teacher assignments                 | DB-ENFORCED       | POSITIVE                      | PASS                      | Single user has 3 active assignments: 8A Math, 8B Science, and 9A Class Teacher
+      28 |          23 | Class Teacher all-subject scope              | BOTH              | POSITIVE                      | PASS                      | Class teacher assignment has subject_id=NULL; application authorizes all class subjects
+      29 |          23 | Class Teacher with subject_id fails          | DB-ENFORCED       | NEGATIVE (EXPECTED REJECTION) | PASS (EXPECTED REJECTION) | Correctly rejected by PostgreSQL (SQLSTATE 23514 matches expected 23514): new row for relation "teacher_assignments" violates check constraint "
+      30 |          24 | Subject Teacher subject scope                | DB-ENFORCED       | POSITIVE                      | PASS                      | Subject teacher assignment requires valid subject_id
+      31 |          24 | Subject Teacher without subject_id fails     | DB-ENFORCED       | NEGATIVE (EXPECTED REJECTION) | PASS (EXPECTED REJECTION) | Correctly rejected by PostgreSQL (SQLSTATE 23514 matches expected 23514): new row for relation "teacher_assignments" violates check constraint "
+      32 |          25 | Calculation settings uniqueness              | DB-ENFORCED       | POSITIVE                      | PASS                      | Configured average_percentage calculation method for Year 2026/27 Class 8
+      33 |          25 | Duplicate calculation settings fails         | DB-ENFORCED       | NEGATIVE (EXPECTED REJECTION) | PASS (EXPECTED REJECTION) | Correctly rejected by PostgreSQL (SQLSTATE 23505 matches expected 23505): duplicate key value violates unique constraint "uk_cs_year_class"
+      34 |          26 | Calculation method values                    | DB-ENFORCED       | POSITIVE                      | PASS                      | Both approved methods (average_percentage, combined_marks) accepted
+      35 |          26 | Invalid calculation method fails             | DB-ENFORCED       | NEGATIVE (EXPECTED REJECTION) | PASS (EXPECTED REJECTION) | Correctly rejected by PostgreSQL (SQLSTATE 22P02 matches expected 22P02): invalid input value for enum calculation_method_enum: "weighted_formul
+      36 |          27 | Report configuration                         | DB-ENFORCED       | POSITIVE                      | PASS                      | Created report configuration with JSONB metadata for Standard Term Report
+      37 |          28 | Report assessment display selection          | DB-ENFORCED       | POSITIVE                      | PASS                      | Configured display order for Unit Test 1 (1) and Term 1 Exam (2)
+      38 |          28 | Duplicate assessment selection fails         | DB-ENFORCED       | NEGATIVE (EXPECTED REJECTION) | PASS (EXPECTED REJECTION) | Correctly rejected by PostgreSQL (SQLSTATE 23505 matches expected 23505): duplicate key value violates unique constraint "uk_ras_config_assessme
+      39 |          29 | Generated report Revision 1                  | DB-ENFORCED       | POSITIVE                      | PASS                      | Created Revision 1 PDF record: /reports/2026-27/8B/john_kumar_t1_r1.pdf
+      40 |          30 | Generated report Revision 2                  | DB-ENFORCED       | POSITIVE                      | PASS                      | Created Revision 2 PDF record: /reports/2026-27/8B/john_kumar_t1_r2.pdf
+      41 |          31 | Historical PDFs not overwritten              | DB-ENFORCED       | POSITIVE                      | PASS                      | Both Revision 1 and Revision 2 exist concurrently with distinct file paths
+      42 |          32 | Revision identity integrity                  | DB-ENFORCED       | NEGATIVE (EXPECTED REJECTION) | PASS (EXPECTED REJECTION) | Correctly rejected by PostgreSQL (SQLSTATE 23505 matches expected 23505): duplicate key value violates unique constraint "uk_gr_revision_identit
+      43 |          33 | Audit log JSON before/after data             | DB-ENFORCED       | POSITIVE                      | PASS                      | Audit log stored and queried JSONB before_data and after_data successfully
+      44 |          34 | Audit log immutability expectation           | APPLICATION-LEVEL | INVARIANT DEMO                | PASS                      | Audit logs table has no UPDATE/DELETE triggers; application policy enforces append-only immutability
+      45 |          35 | FK delete restriction (RESTRICT)             | DB-ENFORCED       | NEGATIVE (EXPECTED REJECTION) | PASS (EXPECTED REJECTION) | Correctly rejected by PostgreSQL (SQLSTATE 23001 matches expected 23001): update or delete on table "academic_years" violates RESTRICT setting o
+      46 |          36 | Academic-year status                         | DB-ENFORCED       | POSITIVE                      | PASS                      | Academic year supports open and closed lifecycle status values
+      47 |          36 | Invalid academic year status fails           | DB-ENFORCED       | NEGATIVE (EXPECTED REJECTION) | PASS (EXPECTED REJECTION) | Correctly rejected by PostgreSQL (SQLSTATE 22P02 matches expected 22P02): invalid input value for enum academic_year_status_enum: "archived"
+      48 |          37 | Current academic-year invariant              | APPLICATION-LEVEL | INVARIANT DEMO                | PASS                      | Application-level invariant: at most one academic year can have is_current=TRUE, enforced during activation transaction
+      49 |          38 | 23-table count                               | DB-ENFORCED       | STRUCTURAL                    | PASS                      | Verified exactly 23 base tables exist in school_report_card public schema
+      50 |          39 | Required indexes/constraints                 | DB-ENFORCED       | STRUCTURAL                    | PASS                      | All 43 FKs use RESTRICT/RESTRICT; 7 CHECK constraints active
+      51 |          40 | Subject snapshot historical behavior         | ARCHITECTURAL     | POSITIVE                      | PASS                      | Master subject renamed to "Advanced Mathematics"; historical snapshot remains "Mathematics"
+      52 |          40 | Class-wide subject uniqueness (NULL section) | DB-ENFORCED       | NEGATIVE (EXPECTED REJECTION) | PASS (EXPECTED REJECTION) | Correctly rejected by PostgreSQL (SQLSTATE 23505 matches expected 23505): duplicate key value violates unique constraint "uk_class_subjects_conf
+      53 |          41 | Case-insensitive username uniqueness         | DB-ENFORCED       | NEGATIVE (EXPECTED REJECTION) | PASS (EXPECTED REJECTION) | Correctly rejected by PostgreSQL (SQLSTATE 23505 matches expected 23505): duplicate key value violates unique constraint "uk_users_username"
+      54 |          42 | Automatic updated_at trigger verification    | DB-ENFORCED       | POSITIVE                      | PASS                      | Direct table update automatically advanced updated_at timestamp without manual column specification
+(54 rows)
+
+ total_tests_executed | total_passed | total_failed | expected_rejections_verified | application_invariants_documented 
+----------------------+--------------+--------------+------------------------------+-----------------------------------
+                   54 |           54 |            0 |                           18 |                                 3
+(1 row)
+
+DELETE 1
+DELETE 2
+DELETE 2
+DELETE 1
+DELETE 2
+DELETE 4
+DELETE 4
+DELETE 2
+DELETE 2
+DELETE 3
+DELETE 5
+DELETE 2
+DELETE 2
+DELETE 7
+DELETE 2
+DELETE 3
+DELETE 2
+DELETE 2
+DELETE 6
+DELETE 3
+DELETE 1
+DROP FUNCTION
+DROP FUNCTION
+DROP TABLE
+                          final_status                           
+-----------------------------------------------------------------
+ ALL VALIDATION SCENARIOS COMPLETED AND TEST FIXTURES CLEANED UP
+(1 row)
+
+
+-----------------------------------------------------------------------------
+2. Executing Real-World Classroom Scale Validation Gate (Scenarios A through P)
+-----------------------------------------------------------------------------
+DROP TABLE
+CREATE TABLE
+CREATE FUNCTION
+DO
+ test_no | scenario_code |                             scenario_name                              | status |  classification   |                                                                               evidence                                                                                
+---------+---------------+------------------------------------------------------------------------+--------+-------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+       1 | A             | Realistic class data (40 students, 8 subjects, 7 assessments)          | PASS   | DB-ENFORCED       | Created and joined 40 students, 8 subjects, 7 assessments, 280 allocations (7/student), 56 applicabilities, and 40 marks
+       2 | B             | Different student electives (Student A vs Student B)                   | PASS   | BOTH              | Student 1 allocated CS only; Student 2 allocated PE only. Elective modification lockout after marks exist is enforced at Application-Level.
+       3 | C             | Teacher A -> Class Teacher correction & audit history                  | PASS   | BOTH              | Teacher A created mark (entered_by); Class Teacher corrected mark (updated_by); latest value (18.50) current; audit log records full JSONB diff.
+       4 | D             | Student transfer 8A -> 8B with historical marks intact                 | PASS   | DB-ENFORCED       | 8A Roll 10 retains UT1 mark (10.00); 8B Roll 22 receives UT2 mark (17.00); placements and marks completely segregated.
+       5 | E             | Fourth term support across assessments, attendance, and reports        | PASS   | DB-ENFORCED       | Term 4 created dynamically; assessment, attendance (48/50), and generated report PDF revision successfully referenced Term 4 without schema change.
+       6 | F             | Ten Unit Tests coexistence and report display ordering (1..10)         | PASS   | DB-ENFORCED       | All 10 Unit Tests (UT1 through UT10) successfully created, linked to report configuration, and ordered by sequence 1 to 10 without column limit.
+       7 | G             | Blank vs Numeric Zero vs Absent distinction                            | PASS   | DB-ENFORCED       | Verified distinct states: Numeric (18.50), Zero (0.00), Absent (NULL, complete/0 in calc), Blank (NULL, incomplete). chk_marks_result_consistency enforces integrity.
+       8 | H             | Subject name snapshot historical protection                            | PASS   | DB-ENFORCED       | Master subject renamed to "Ancient Sanskrit Literature"; class_subjects.subject_name_snapshot immutably preserved "Sanskrit".
+       9 | I             | Different maximum marks per assessment/subject & upper bound invariant | PASS   | BOTH              | Math max marks vary correctly: UT1=20, Midterm=50, Term Exam=100. Application-level invariant enforces mark <= maximum_marks before save.
+      10 | J             | Display selection vs calculation participation                         | PASS   | APPLICATION-LEVEL | Report configuration selects all 7 assessments for visual display; calculation service strictly filters only Term Exam for term percentage calculation.
+      11 | K             | Attendance real-world cases (45/50, 0/0, rejection of >total)          | PASS   | BOTH              | 45/50 yields 90.00%; 0/0 stored without DB divide-by-zero error (app renders N/A); chk_attendance_days_within_total rejects days > total.
+      12 | L             | Historical report revisions (Rev 1 & Rev 2 coexistence & uniqueness)   | PASS   | DB-ENFORCED       | Rev 1 and Rev 2 coexist with distinct file paths; uk_gr_revision_identity prevents duplicate revision numbers for same report context.
+      13 | M             | Multiple teacher assignments per user account                          | PASS   | DB-ENFORCED       | Single user account has 3 concurrent scopes: 8A Math (subject), 8B Science (subject), and 9A (class teacher, all subjects).
+      14 | N             | Marks cross-reference integrity invariant                              | PASS   | APPLICATION-LEVEL | 100% of marks rows satisfy the 5-point transactional cross-reference integrity invariant; 0 mismatches across 40 student records.
+      15 | O             | Multi-student relational data isolation                                | PASS   | DB-ENFORCED       | Relational queries completely isolate Student 1 (18.50, CS) from Student 2 (0.00, PE) with 0 bleeding across 40 class students.
+      16 | P             | Report completion logic (complete vs incomplete independence)          | PASS   | APPLICATION-LEVEL | Student 1 evaluates as COMPLETE (valid numeric); Student 5 evaluates as INCOMPLETE (blank mark); Student 1 generation unblocked by Student 5.
+(16 rows)
+
+ total_scenarios_tested | passed | failed 
+------------------------+--------+--------
+                     16 |     16 |      0
+(1 row)
+
+DELETE 1
+DELETE 2
+DELETE 10
+DELETE 1
+DELETE 3
+DELETE 41
+DELETE 57
+DELETE 13
+DELETE 3
+DELETE 4
+DELETE 281
+DELETE 41
+DELETE 40
+DELETE 16
+DELETE 1
+DELETE 3
+DELETE 2
+DELETE 4
+DELETE 8
+DELETE 3
+DELETE 1
+DROP FUNCTION
+DROP TABLE
+                       final_status                        
+-----------------------------------------------------------
+ PHASE 5 VALIDATION SUITE COMPLETE AND FIXTURES CLEANED UP
+(1 row)
+
+
+-----------------------------------------------------------------------------
+3. Final Baseline Verification (Seed Roles Preservation)
+-----------------------------------------------------------------------------
+ id |      name       |                                    description                                     | is_active 
+----+-----------------+------------------------------------------------------------------------------------+-----------
+  1 | Administrator   | Full system access including user management, configuration, and audit log viewing | t
+  2 | Office Staff    | Student management, data entry, and report generation                              | t
+  3 | Subject Teacher | Mark entry and viewing for assigned subjects                                       | t
+  4 | Class Teacher   | Mark entry and viewing for all subjects in assigned class/section                  | t
+(4 rows)
+
+=============================================================================
+ALL POSTGRESQL VALIDATION RUNS COMPLETE.
+=============================================================================

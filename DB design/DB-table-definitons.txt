@@ -1,0 +1,25 @@
+| Table                          | Main relationships                                                                           |
+| ------------------------------ | -------------------------------------------------------------------------------------------- |
+| `roles`                        | → users                                                                                      |
+| `users`                        | → role, teacher assignments, marks, attendance, reports, audit logs                          |
+| `academic_years`               | → terms, sections, class subjects, students, assessments, assignments, calculations, reports |
+| `terms`                        | → academic year, assessments, attendance, generated reports                                  |
+| `classes`                      | → sections, class subjects, calculation settings, teacher assignments                        |
+| `sections`                     | → academic year + class; used by students, assignments, class subjects                       |
+| `subjects`                     | → class subjects                                                                             |
+| `class_subjects`               | → academic class/section/subject configuration; **contains subject name snapshot**           |
+| `students`                     | → historical academic records                                                                |
+| `student_academic_records`     | → student placement, subject allocations, marks, attendance, generated reports               |
+| `student_subject_allocations`  | → student's applicable subjects                                                              |
+| `assessment_types`             | → assessments                                                                                |
+| `assessments`                  | → term/type + applicability + report selection                                               |
+| `assessment_applicability`     | → assessment + class subject + maximum marks                                                 |
+| `teacher_assignments`          | → user + academic scope                                                                      |
+| `marks`                        | → student placement + subject allocation + assessment applicability                          |
+| `attendance`                   | → student placement + term                                                                   |
+| `calculation_settings`         | → one method per academic-year/class                                                         |
+| `report_configurations`        | → report display configuration                                                               |
+| `report_assessment_selections` | → selected assessments and order                                                             |
+| `school_settings`              | → singleton school configuration                                                             |
+| `generated_reports`            | → historical PDF revisions                                                                   |
+| `audit_logs`                   | → immutable activity history                                                                 |
