@@ -12,7 +12,7 @@ class ClassSubjectPolicy
         return $user->isAdmin() || $user->isOfficeStaff();
     }
 
-    public function view(User $user, ClassSubject $classSubject): bool
+    public function view(User $user, ?ClassSubject $classSubject = null): bool
     {
         return $user->isAdmin() || $user->isOfficeStaff();
     }
@@ -22,12 +22,12 @@ class ClassSubjectPolicy
         return $user->isAdmin() || $user->isOfficeStaff();
     }
 
-    public function update(User $user, ClassSubject $classSubject): bool
+    public function update(User $user, ?ClassSubject $classSubject = null): bool
     {
         return $user->isAdmin() || $user->isOfficeStaff();
     }
 
-    public function delete(User $user, ClassSubject $classSubject): bool
+    public function delete(User $user, ?ClassSubject $classSubject = null): bool
     {
         return $user->isAdmin();
     }

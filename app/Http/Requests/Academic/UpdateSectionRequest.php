@@ -9,7 +9,8 @@ class UpdateSectionRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->isAdmin() || $this->user()?->isOfficeStaff();
+        $section = $this->route('section');
+        return $this->user()?->can('update', $section) ?? false;
     }
 
     public function rules(): array

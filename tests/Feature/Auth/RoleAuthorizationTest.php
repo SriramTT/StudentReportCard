@@ -149,31 +149,32 @@ class RoleAuthorizationTest extends TestCase
         $this->assertFalse(Gate::forUser($this->adminUser)->allows('delete', $log));
     }
 
-    public function test_user_management_is_restricted_to_administrator(): void
+    public function test_user_management_is_accessible_to_administrator_and_office_staff(): void
     {
         $this->assertTrue(Gate::forUser($this->adminUser)->allows('create', User::class));
-        $this->assertFalse(Gate::forUser($this->officeStaffUser)->allows('create', User::class));
+        $this->assertTrue(Gate::forUser($this->officeStaffUser)->allows('create', User::class));
         $this->assertFalse(Gate::forUser($this->subjectTeacherUser)->allows('create', User::class));
         $this->assertFalse(Gate::forUser($this->classTeacherUser)->allows('create', User::class));
 
         // Users can never be hard-deleted
         $this->assertFalse(Gate::forUser($this->adminUser)->allows('delete', $this->officeStaffUser));
+        $this->assertFalse(Gate::forUser($this->officeStaffUser)->allows('delete', $this->subjectTeacherUser));
     }
 
-    public function test_school_settings_can_only_be_mutated_by_administrator(): void
+    public function test_school_settings_can_be_mutated_by_administrator_and_office_staff(): void
     {
         $setting = new SchoolSetting();
         $this->assertTrue(Gate::forUser($this->adminUser)->allows('update', $setting));
-        $this->assertFalse(Gate::forUser($this->officeStaffUser)->allows('update', $setting));
+        $this->assertTrue(Gate::forUser($this->officeStaffUser)->allows('update', $setting));
         $this->assertFalse(Gate::forUser($this->subjectTeacherUser)->allows('update', $setting));
         $this->assertFalse(Gate::forUser($this->classTeacherUser)->allows('update', $setting));
     }
 
-    public function test_academic_year_lifecycle_management_is_administrator_only(): void
+    public function test_academic_year_lifecycle_management_allows_administrator_and_office_staff(): void
     {
         $academicYear = new AcademicYear();
         $this->assertTrue(Gate::forUser($this->adminUser)->allows('close', $academicYear));
-        $this->assertFalse(Gate::forUser($this->officeStaffUser)->allows('close', $academicYear));
+        $this->assertTrue(Gate::forUser($this->officeStaffUser)->allows('close', $academicYear));
         $this->assertFalse(Gate::forUser($this->subjectTeacherUser)->allows('close', $academicYear));
         $this->assertFalse(Gate::forUser($this->classTeacherUser)->allows('close', $academicYear));
     }

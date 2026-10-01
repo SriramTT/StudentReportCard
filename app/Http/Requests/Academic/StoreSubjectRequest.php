@@ -8,13 +8,13 @@ class StoreSubjectRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->isAdmin() || $this->user()?->isOfficeStaff();
+        return $this->user()?->can('create', \App\Models\Subject::class) ?? false;
     }
 
     public function rules(): array
     {
         return [
-            'name' => ['required', 'string', 'max:100', 'unique:subjects,name'],
+            'name' => ['required', 'string', 'max:100'],
             'code' => ['required', 'string', 'max:20', 'unique:subjects,code'],
             'category' => ['required', 'in:main,elective'],
             'is_active' => ['nullable', 'boolean'],

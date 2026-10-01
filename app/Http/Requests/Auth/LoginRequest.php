@@ -31,6 +31,19 @@ class LoginRequest extends FormRequest
     }
 
     /**
+     * Get custom validation messages.
+     *
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'username.required' => 'Username is required.',
+            'password.required' => 'Password is required.',
+        ];
+    }
+
+    /**
      * Get the rate limiting throttle key for the request.
      */
     public function throttleKey(): string

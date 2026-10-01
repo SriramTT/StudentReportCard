@@ -64,11 +64,13 @@ class SchoolClassAndSectionTest extends TestCase
 
     public function test_classes_can_be_created_and_updated(): void
     {
-        $response = $this->actingAs($this->officeStaff)->post(route('classes.store'), [
+        // Office staff can create classes
+        $officeResponse = $this->actingAs($this->officeStaff)->post(route('classes.store'), [
             'name' => 'Class 8',
             'is_active' => 1,
         ]);
-        $response->assertRedirect(route('classes.index'));
+        $officeResponse->assertRedirect(route('classes.index'));
+        $officeResponse->assertSessionHas('success');
 
         $class = SchoolClass::where('name', 'Class 8')->first();
         $this->assertNotNull($class);
@@ -79,13 +81,25 @@ class SchoolClassAndSectionTest extends TestCase
         ]);
         $dupResponse->assertSessionHasErrors('name');
 
-        // Deactivate class
-        $this->actingAs($this->admin)->put(route('classes.update', $class), [
-            'name' => 'Class 8',
+        // Office staff can update/deactivate class
+        $staffUpdateResponse = $this->actingAs($this->officeStaff)->put(route('classes.update', $class), [
+            'name' => 'Class 8 Renamed',
             'is_active' => 0,
         ]);
+        $staffUpdateResponse->assertRedirect(route('classes.index'));
+        $staffUpdateResponse->assertSessionHas('success');
         $class->refresh();
+        $this->assertEquals('Class 8 Renamed', $class->name);
         $this->assertFalse($class->is_active);
+
+        // Admin can update/deactivate class
+        $this->actingAs($this->admin)->put(route('classes.update', $class), [
+            'name' => 'Class 8',
+            'is_active' => 1,
+        ]);
+        $class->refresh();
+        $this->assertEquals('Class 8', $class->name);
+        $this->assertTrue($class->is_active);
     }
 
     public function test_sections_can_be_created_with_contextual_uniqueness(): void
@@ -135,11 +149,91 @@ class SchoolClassAndSectionTest extends TestCase
 
         $class = SchoolClass::create(['name' => 'Class ' . uniqid(), 'is_active' => true]);
 
+        $updateResponse = $this->actingAs($this->teacher)->put(route('classes.update', $class), [
+            'name' => 'Class Teacher Rename Attempt',
+            'is_active' => 1,
+        ]);
+        $updateResponse->assertStatus(403);
+
+        $deleteResponse = $this->actingAs($this->teacher)->delete(route('classes.destroy', $class));
+        $deleteResponse->assertStatus(403);
+
         $sectionResponse = $this->actingAs($this->teacher)->post(route('sections.store'), [
             'academic_year_id' => $this->year->id,
             'class_id' => $class->id,
             'name' => 'X',
         ]);
         $sectionResponse->assertStatus(403);
+    }
+
+    // ============================================================
+    // CHANGE #6: CONSOLIDATED CLASS & SECTIONS UI AND WORKFLOW
+    // ============================================================
+
+    public function test_consolidated_creation_creates_class_and_multiple_sections_atomically(): void
+    {
+        $className = 'Class ' . uniqid();
+        $response = $this->actingAs($this->admin)->post(route('sections.store'), [
+            'academic_year_id' => $this->year->id,
+            'class_name' => $className,
+            'section_names' => ['A', 'B', 'C'],
+            'is_active' => 1,
+        ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHas('success');
+
+        $createdClass = SchoolClass::where('name', $className)->first();
+        $this->assertNotNull($createdClass);
+
+        $this->assertDatabaseHas('sections', [
+            'academic_year_id' => $this->year->id,
+            'class_id' => $createdClass->id,
+            'name' => 'A',
+            'is_active' => true,
+        ]);
+        $this->assertDatabaseHas('sections', [
+            'academic_year_id' => $this->year->id,
+            'class_id' => $createdClass->id,
+            'name' => 'B',
+            'is_active' => true,
+        ]);
+        $this->assertDatabaseHas('sections', [
+            'academic_year_id' => $this->year->id,
+            'class_id' => $createdClass->id,
+            'name' => 'C',
+            'is_active' => true,
+        ]);
+    }
+
+    public function test_consolidated_creation_rejects_duplicate_sections_within_request(): void
+    {
+        $className = 'Class ' . uniqid();
+        $response = $this->actingAs($this->admin)->post(route('sections.store'), [
+            'academic_year_id' => $this->year->id,
+            'class_name' => $className,
+            'section_names' => ['Alpha', 'Beta', 'Alpha'],
+            'is_active' => 1,
+        ]);
+
+        $response->assertSessionHasErrors('section_names');
+
+        // Atomicity check: Class and sections must NOT be created
+        $this->assertDatabaseMissing('classes', ['name' => $className]);
+    }
+
+    public function test_sections_page_renders_add_class_button_and_sidebar_excludes_standalone_classes(): void
+    {
+        $response = $this->actingAs($this->admin)->get(route('sections.index'));
+
+        $response->assertStatus(200);
+        $response->assertSee('+ Add Class');
+        $response->assertDontSee('+ Add Section');
+        $response->assertSee('id="create_class_name"', false);
+        $response->assertSee('name="section_names[]"', false);
+
+        // Sidebar check: standalone Classes nav item must be removed from normal navigation
+        $response->assertDontSee('<span class="nav-text">Classes</span>', false);
+        $response->assertSee('<span class="nav-text">Sections</span>', false);
     }
 }

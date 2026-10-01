@@ -157,4 +157,45 @@ class CalculationAndReportConfigurationTest extends TestCase
         $this->assertArrayNotHasKey('contributes_to_calculation', $selection->getAttributes());
         $this->assertArrayNotHasKey('weight', $selection->getAttributes());
     }
+
+    public function test_report_configurations_index_renders_without_lazy_loading_violation(): void
+    {
+        $config = ReportConfiguration::create([
+            'academic_year_id' => $this->year->id,
+            'name' => 'Term 1 Report Layout ' . uniqid(),
+            'report_type' => ReportType::TERM,
+            'is_active' => true,
+        ]);
+
+        $type = AssessmentType::create(['name' => 'Type_' . uniqid(), 'is_active' => true]);
+        $assessment = Assessment::create([
+            'academic_year_id' => $this->year->id,
+            'assessment_type_id' => $type->id,
+            'name' => 'Midterm Assessment ' . uniqid(),
+            'status' => 'active',
+        ]);
+
+        ReportAssessmentSelection::create([
+            'report_configuration_id' => $config->id,
+            'assessment_id' => $assessment->id,
+            'display_order' => 1,
+            'is_displayed' => true,
+        ]);
+
+        // 1. Admin accesses reports.configurations.index with no filter
+        $response = $this->actingAs($this->admin)->get(route('reports.configurations.index'));
+        $response->assertStatus(200);
+        $response->assertSee($config->name);
+        $response->assertSee($assessment->name);
+        $response->assertSee($this->year->name);
+
+        // 2. Office staff accesses reports.configurations.index with academic_year_id filter
+        $filteredResponse = $this->actingAs($this->officeStaff)->get(
+            route('reports.configurations.index', ['academic_year_id' => $this->year->id])
+        );
+        $filteredResponse->assertStatus(200);
+        $filteredResponse->assertSee($config->name);
+        $filteredResponse->assertSee($assessment->name);
+        $filteredResponse->assertSee($this->year->name);
+    }
 }

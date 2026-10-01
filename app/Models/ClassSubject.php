@@ -57,4 +57,16 @@ class ClassSubject extends Model
     {
         return $this->hasMany(AssessmentApplicability::class, 'class_subject_id');
     }
+
+    public function marks(): \Illuminate\Database\Eloquent\Relations\HasManyThrough
+    {
+        return $this->hasManyThrough(
+            Mark::class,
+            AssessmentApplicability::class,
+            'class_subject_id',
+            'assessment_applicability_id',
+            'id',
+            'id'
+        );
+    }
 }

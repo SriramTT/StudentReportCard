@@ -8,7 +8,7 @@ class StoreSchoolClassRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->isAdmin() || $this->user()?->isOfficeStaff();
+        return $this->user()?->can('create', \App\Models\SchoolClass::class) ?? false;
     }
 
     public function rules(): array

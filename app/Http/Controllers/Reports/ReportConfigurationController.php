@@ -26,15 +26,35 @@ class ReportConfigurationController extends Controller
 
         $academicYears = AcademicYear::orderBy('start_date', 'desc')->get();
         $selectedYearId = $request->query('academic_year_id');
+        $selectedReportType = $request->query('report_type');
 
-        $query = ReportConfiguration::with(['academicYear', 'assessmentSelections.assessment']);
+        $query = ReportConfiguration::with([
+            'academicYear',
+            'assessmentSelections' => fn ($q) => $q->orderBy('display_order', 'asc')->with(['assessment.academicYear', 'assessment.term', 'assessment.assessmentType']),
+        ]);
+
         if ($selectedYearId) {
             $query->where('academic_year_id', $selectedYearId);
         }
-        $configurations = $query->orderBy('name', 'asc')->get();
+
+        if ($selectedReportType && $selectedReportType !== 'all') {
+            match ($selectedReportType) {
+                'term' => $query->where('report_type', \App\Enums\ReportType::TERM),
+                'final' => $query->where('report_type', \App\Enums\ReportType::FINAL),
+                'mid_term' => $query->where('report_type', \App\Enums\ReportType::EXAM)
+                    ->whereRaw("(configuration_data->>'subtype') = 'mid_term'"),
+                'custom' => $query->where('report_type', \App\Enums\ReportType::EXAM)
+                    ->whereRaw("((configuration_data->>'subtype') = 'custom' OR (configuration_data->>'subtype') IS NULL)"),
+                default => null,
+            };
+        }
+
+        $configurations = $query->orderBy('created_at', 'desc')
+            ->orderBy('id', 'desc')
+            ->get();
 
         // Assessments available for selection based on selected year
-        $assessments = Assessment::where('status', 'active');
+        $assessments = Assessment::with(['academicYear', 'term', 'assessmentType'])->where('status', 'active');
         if ($selectedYearId) {
             $assessments->where('academic_year_id', $selectedYearId);
         }
@@ -45,6 +65,7 @@ class ReportConfigurationController extends Controller
             'academicYears' => $academicYears,
             'availableAssessments' => $availableAssessments,
             'selectedYearId' => $selectedYearId ? (int) $selectedYearId : null,
+            'selectedReportType' => $selectedReportType ?: 'all',
         ]);
     }
 
@@ -66,5 +87,25 @@ class ReportConfigurationController extends Controller
 
         return redirect()->route('reports.configurations.index', ['academic_year_id' => $reportConfiguration->academic_year_id])
             ->with('success', 'Report configuration updated successfully.');
+    }
+
+    public function destroy(ReportConfiguration $reportConfiguration): RedirectResponse
+    {
+        Gate::authorize('delete', $reportConfiguration);
+
+        $academicYearId = $reportConfiguration->academic_year_id;
+
+        try {
+            $this->reportConfigService->deleteReportConfiguration($reportConfiguration);
+        } catch (\DomainException $e) {
+            return redirect()->route('reports.configurations.index', ['academic_year_id' => $academicYearId])
+                ->with('error', $e->getMessage());
+        } catch (\Illuminate\Database\QueryException $e) {
+            return redirect()->route('reports.configurations.index', ['academic_year_id' => $academicYearId])
+                ->with('error', 'This report configuration cannot be removed because it is referenced by other records.');
+        }
+
+        return redirect()->route('reports.configurations.index', ['academic_year_id' => $academicYearId])
+            ->with('success', 'Report configuration removed successfully.');
     }
 }

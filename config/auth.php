@@ -114,4 +114,22 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Login OTP Settings
+    |--------------------------------------------------------------------------
+    |
+    | Two-step verification settings for user authentication.
+    | When enabled, users must provide a 6-digit email OTP after password check.
+    |
+    */
+
+    'otp' => [
+        'enabled' => env('AUTH_OTP_ENABLED', false),
+        'length' => 6,
+        'expires_in_minutes' => 5,
+        'max_attempts' => 3,
+        'resend_cooldown_seconds' => 60,
+    ],
+
 ];

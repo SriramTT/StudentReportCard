@@ -104,7 +104,7 @@ The frontend architecture is governed by ten unyielding principles:
 4. **Progressive Enhancement & Ergonomics:** Forms and navigation function using standard HTML POST/GET. Vanilla JavaScript enhances the user experience with asynchronous batch saving, spreadsheet keyboard navigation, dependent dropdown fetching, and modal dialogs.
 5. **Absolute Server-Side Security Boundary:** The UI is purely a presentation layer. JavaScript and Blade hiding (`@can`, `@if`) provide user guidance, never authorization. Every HTTP submission is authenticated, authorized, and validated independently on the server.
 6. **Strict Ternary Mark Representation:** The UI strictly differentiates `blank` (no result has been entered, incomplete), `numeric` ($0.00 \le \text{mark} \le \text{contextual } \text{max\_marks}$, valid score), and `absent` (`A`, complete, contributes $0.00$ to calculations). Blank is never coerced to zero.
-7. **Domain Model Integrity (No Invented Fields):** The UI strictly represents only data attributes defined in the approved 23-table schema. The UI must never invent or display unsupported fields (such as admission numbers, student dates of birth, student gender, parent names, registration numbers, or unapproved metadata).
+7. **Domain Model Integrity (No Invented Fields):** The UI strictly represents only data attributes defined in the approved schema. The UI must never invent or display unsupported fields (such as student dates of birth, student gender, parent names, registration numbers, or unapproved demographic metadata). *(Note: `admission_number` was approved as the unique student business identifier under DEC-072 in Phase 10).*
 8. **Historical Placement Integrity:** Student academic placements (`student_academic_records`) represent immutable historical reality. The UI displays historical classroom allocations chronologically and never gives the impression that past records are overwritten by transfers.
 9. **WCAG 2.1 AA Accessibility:** High contrast text ratios ($\ge 4.5:1$ for normal body text, $\ge 3:1$ for large text and UI components), visible focus rings, aria-describedby form errors, and keyboard operable data grids.
 10. **Strict CSP & Zero Inline Scripts:** In conformance with Content Security Policy level 3 directives, zero inline scripts (`onclick=`, `<script>alert()</script>`) are permitted. All events are attached via DOM event listeners and data attributes.
@@ -450,18 +450,20 @@ The student detail view (`/students/{student}`) visually bifurcates immutable id
 +-------------------------------------------------------------------------------------------------+
 ```
 
-- **Master Student Identity (`students` table):** Contains only `student_name`. Internal database primary key (`id`) is used solely for routing and relationship binding; it is never presented as an invented business identifier.
-- **Prohibition of Invented Fields:** The UI strictly avoids displaying or collecting unsupported attributes (e.g. admission number, date of birth, gender, parent/guardian names, admission date, address, phone, email, blood group, photo).
+- **Master Student Identity (`students` table):** Contains `student_name` and `admission_number` (approved under DEC-072 as the unique student business identifier). Internal database primary key (`id`) is used solely for relational FK targeting and routing; `admission_number` is displayed as the primary user-facing business identifier.
+- **Prohibition of Demographic Fields:** The UI strictly avoids displaying or collecting unsupported demographic attributes (e.g. date of birth, gender, parent/guardian names, admission date, address, phone, email, blood group, photo).
 - **Academic Placement History (`student_academic_records` table):** Displays historical classroom allocations chronologically.
   - Statuses reflect the placement status enum: `active`, `internal_transfer`, `withdrawn`, `transferred_out` (BR-042).
   - Transfers between classes or sections close the previous record (`effective_to`) and create a new placement record from `effective_from` (BR-037). Historical marks remain permanently bound to the prior academic record (BR-038).
 
 ### 13.2 Student CSV Import Workflow
-The import interface (`/students/import`) conforms strictly to BR-069, BR-071, BR-072, and CL-009:
+The import interface (`/students/import`) conforms to BR-069–072 as reconciled by DEC-072:
 
-1. **Explicit Re-Import Warning (CL-009):** The interface displays a prominent warning callout:  
-   > **Notice:** Re-importing creates new student records. The system does not automatically match or overwrite existing students.
-2. **Supported CSV Columns:** `student_name`, `class_name`, `section_name`, `roll_number`, `effective_from`. No admission number or demographic fields exist in the CSV template.
+1. **Context & Matching Protocol (DEC-072):** The upload form captures Academic Year, Class, and Section context. CSV contains `admission_number,student_name,roll_number`.
+   - New admission numbers create master students and classroom placement.
+   - Existing admission numbers reuse the student master (without creating duplicates) and associate placement.
+   - Name mismatches on existing admission numbers are rejected with row-level errors.
+2. **Supported CSV Columns:** `admission_number`, `student_name`, `roll_number`. (Superseded by DEC-072; previous baseline omitted admission numbers).
 3. **Execution & Partial Import Reporting (BR-071, BR-072):**
    - Partial imports are permitted: valid rows are inserted, while invalid rows are rejected.
    - Summary statistics display: Total Processed Rows, Successfully Created Rows, and Rejected Rows Count.
@@ -1052,7 +1054,7 @@ To prevent architectural degradation, the following practices are strictly prohi
 - ❌ **NO Frontend Calculation Authority:** JavaScript must never be treated as the final authority for term percentages, attendance ratios, or pass/fail determinations. Server-side services remain authoritative.
 - ❌ **NO Batch PDF Generation UI:** Do NOT build UI controls for batch zip downloads or classroom PDF compilation (deferred to Phase 6.8). Report generation is strictly per-student.
 - ❌ **NO Unapproved Domain Features:** Do NOT invent ranking toggles, student GPA calculators, parent portals, or payment gateways.
-- ❌ **NO Admission Numbers or Demographic Inventions:** Do NOT invent admission numbers, dates of birth, parent names, or student demographic fields.
+- ❌ **NO Admission Numbers or Demographic Inventions (Pre-Phase 10):** Do NOT invent dates of birth, parent names, or student demographic fields. *(Note: `admission_number` was approved as the student business identifier under DEC-072 in Phase 10).*
 
 ---
 
@@ -1084,6 +1086,7 @@ To prevent architectural degradation, the following practices are strictly prohi
 | **DEC-046** | Modular Plain CSS & zero framework styling architecture | Section 19 | `resources/css/app.css` | Vite CSS bundling |
 | **DEC-047** | Atomic Blade component tree & layout composition standard | Section 17 | `resources/views/components/` | Blade compiler |
 | **DEC-048** | Vanilla JavaScript progressive enhancement & event-driven architecture | Section 20 | `resources/js/app.js` | Client ES2024 runtime |
+| **DEC-072** | Student admission number unique business identifier & CSV import identity reconciliation | Section 13 | `Student`, `StudentImportService` | `students.admission_number`, `uk_students_admission_number` |
 
 ---
 
@@ -1092,8 +1095,8 @@ To prevent architectural degradation, the following practices are strictly prohi
 Before proceeding to Phase 6.8, the frontend integration architecture has been audited and verified against all project constraints:
 
 - [x] **No Database Schema Changes:** Relational 23-table schema remains strictly untouched. Zero UI tables, permission columns, or role flags introduced.
-- [x] **No Admission Number:** Admission number, admission ID, and student registration code are completely absent from the database, UI displays, search, and CSV import.
-- [x] **Student Master Profile Reflects Backend:** Master profile represents only supported student identity attributes (`students.student_name`). Internal ID is not treated as a business identifier.
+- [x] **No Admission Number (Pre-Phase 10 Baseline):** Admission number was excluded from Phase 6 baseline; formally superseded by DEC-072 in Phase 10 with `students.admission_number` (`VARCHAR(50) NOT NULL UNIQUE`).
+- [x] **Student Master Profile Reflects Backend:** Master profile represents supported student identity attributes (`students.student_name`, `students.admission_number`). Internal ID is not treated as a business identifier.
 - [x] **Student Academic Placement History Accurately Modeled:** Placement records map 1-to-1 to `student_academic_records` (`academic_year_id`, `class_id`, `section_id`, `roll_number`, `status`, `effective_from`, `effective_to`).
 - [x] **Student Import Aligned with Business Rules:** Re-import creates new student records with zero automatic matching; prominent warning callout included; accepted/rejected rows reported with reasons.
 - [x] **Numeric Marks Bounded by Contextual Max Marks:** Removed universal 100-mark assumption; max marks are contextual per `assessment_applicability` ($0.00 \le \text{mark} \le \text{max\_marks}$).

@@ -15,7 +15,7 @@ use Illuminate\View\View;
 class AssessmentTypeController extends Controller
 {
     public function __construct(
-        protected AuditService $auditService
+        protected \App\Services\AssessmentTypeService $assessmentTypeService
     ) {}
 
     public function index(): View
@@ -35,20 +35,7 @@ class AssessmentTypeController extends Controller
     {
         Gate::authorize('create', AssessmentType::class);
 
-        $assessmentType = AssessmentType::create([
-            'name' => trim($request->validated('name')),
-            'is_active' => $request->boolean('is_active', true),
-        ]);
-
-        $this->auditService->logDomainAction(
-            userId: Auth::id(),
-            action: 'CREATE_ASSESSMENT_TYPE',
-            entityType: 'assessment_types',
-            entityId: $assessmentType->id,
-            beforeData: null,
-            afterData: $assessmentType->only(['name', 'is_active']),
-            description: "Created assessment type: {$assessmentType->name}"
-        );
+        $this->assessmentTypeService->createAssessmentType($request->validated(), (int) Auth::id());
 
         return redirect()->route('assessments.types.index')
             ->with('success', 'Assessment type created successfully.');
@@ -58,26 +45,27 @@ class AssessmentTypeController extends Controller
     {
         Gate::authorize('update', $assessmentType);
 
-        $beforeData = $assessmentType->only(['name', 'is_active']);
-
-        $assessmentType->update([
-            'name' => trim($request->validated('name')),
-            'is_active' => $request->boolean('is_active', true),
-        ]);
-
-        $afterData = $assessmentType->fresh()->only(['name', 'is_active']);
-
-        $this->auditService->logDomainAction(
-            userId: Auth::id(),
-            action: 'UPDATE_ASSESSMENT_TYPE',
-            entityType: 'assessment_types',
-            entityId: $assessmentType->id,
-            beforeData: $beforeData,
-            afterData: $afterData,
-            description: "Updated assessment type: {$assessmentType->name}"
-        );
+        $this->assessmentTypeService->updateAssessmentType($assessmentType, $request->validated(), (int) Auth::id());
 
         return redirect()->route('assessments.types.index')
             ->with('success', 'Assessment type updated successfully.');
+    }
+
+    public function destroy(AssessmentType $assessmentType): RedirectResponse
+    {
+        Gate::authorize('delete', $assessmentType);
+
+        try {
+            $this->assessmentTypeService->deleteAssessmentType($assessmentType, (int) Auth::id());
+        } catch (\DomainException $e) {
+            return redirect()->route('assessments.types.index')
+                ->with('error', $e->getMessage());
+        } catch (\Illuminate\Database\QueryException $e) {
+            return redirect()->route('assessments.types.index')
+                ->with('error', 'This assessment type cannot be removed because it is referenced by existing assessments.');
+        }
+
+        return redirect()->route('assessments.types.index')
+            ->with('success', 'Assessment type removed successfully.');
     }
 }

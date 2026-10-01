@@ -11,10 +11,6 @@
                 <h3 style="color: var(--color-primary); margin-bottom: 0.25rem;">
                     Welcome back, {{ auth()->user()->display_name }}
                 </h3>
-                <p style="color: var(--color-text-muted); font-size: var(--font-size-sm); margin: 0;">
-                    You are logged in as <strong>{{ auth()->user()->username }}</strong> with system role
-                    <span class="badge badge-primary">{{ auth()->user()->role?->name ?? 'Staff' }}</span>.
-                </p>
             </div>
             <div>
                 @php

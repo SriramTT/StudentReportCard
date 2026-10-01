@@ -4,10 +4,14 @@
 -- Target: PostgreSQL 15+
 -- =============================================================================
 
--- Target database: school_report_card
--- PostgreSQL-native validation suite utilizing PL/pgSQL for real execution
--- of positive scenarios, negative constraint violation trapping (SQLSTATE),
--- structural table/FK/check verification, and application invariant documentation.
+-- Target database: school_report_card_audit (Dedicated validation database)
+-- Safety Guard:
+DO $$
+BEGIN
+    IF current_database() = 'school_report_card' THEN
+        RAISE EXCEPTION 'CRITICAL SAFETY GUARD TRIGGERED: Validation suite contains teardown scripts and cannot be executed against persistent application database ''school_report_card''. Please target dedicated test/validation database ''school_report_card_audit''.';
+    END IF;
+END $$;
 
 -- -----------------------------------------------------------------------------
 -- 1. SETUP VALIDATION HARNESS TABLE & PROCEDURES
@@ -103,6 +107,7 @@ DECLARE
     v_sec_9a_id BIGINT;
     v_student_id BIGINT;
     v_student2_id BIGINT;
+    v_student3_id BIGINT;
     v_sar_8a_id BIGINT;
     v_sar_8b_id BIGINT;
     v_sub_math_id BIGINT;
@@ -155,6 +160,8 @@ DECLARE
     v_snap_val VARCHAR(150);
     v_time_before TIMESTAMPTZ;
     v_time_after TIMESTAMPTZ;
+    v_ay2_id BIGINT;
+    v_term_ay2_id BIGINT;
 BEGIN
     -- =========================================================================
     -- SCENARIO 1: Academic Hierarchy
@@ -186,7 +193,7 @@ BEGIN
     -- =========================================================================
     -- SCENARIO 2: Student Placement
     -- =========================================================================
-    INSERT INTO students (student_name) VALUES ('John Kumar') RETURNING id INTO v_student_id;
+    INSERT INTO students (admission_number, student_name) VALUES ('ADM-VAL-001', 'John Kumar') RETURNING id INTO v_student_id;
 
     INSERT INTO student_academic_records (student_id, academic_year_id, class_id, section_id, roll_number, status, effective_from)
     VALUES (v_student_id, v_ay_id, v_class8_id, v_sec_8a_id, 15, 'active', '2026-04-01')
@@ -220,7 +227,7 @@ BEGIN
     END IF;
 
     -- Negative test: duplicate roll number in same year+class+section must fail (SQLSTATE 23505)
-    INSERT INTO students (student_name) VALUES ('Another Student') RETURNING id INTO v_student2_id;
+    INSERT INTO students (admission_number, student_name) VALUES ('ADM-VAL-002', 'Another Student') RETURNING id INTO v_student2_id;
     PERFORM assert_negative_sql(
         4, 'Historical roll number uniqueness', 'DB-ENFORCED',
         'INSERT INTO student_academic_records (student_id, academic_year_id, class_id, section_id, roll_number, status, effective_from) VALUES (' || v_student2_id || ', ' || v_ay_id || ', ' || v_class8_id || ', ' || v_sec_8b_id || ', 22, ''active'', ''2026-08-01'');',
@@ -742,6 +749,91 @@ BEGIN
     ELSE
         PERFORM record_result(42, 'Automatic updated_at trigger verification', 'DB-ENFORCED', 'POSITIVE', 'FAIL', 'updated_at timestamp was not updated by trigger');
     END IF;
+
+    -- =========================================================================
+    -- PHASE 10: STUDENT ADMISSION NUMBER INTEGRITY (DEC-072)
+    -- Scenario 43: Admission number NOT NULL rejection (SQLSTATE 23502)
+    -- Scenario 44: Duplicate admission number rejection (SQLSTATE 23505)
+    -- Scenario 45: Admission number max length 50 rejection (SQLSTATE 22001)
+    -- Scenario 46: Valid unique admission number positive insertion
+    -- =========================================================================
+    PERFORM assert_negative_sql(
+        43, 'Student admission_number NOT NULL enforcement', 'DB-ENFORCED',
+        'INSERT INTO students (student_name) VALUES (''Missing Admission Student'');',
+        '23502',
+        'NULL admission_number rejected by NOT NULL constraint'
+    );
+
+    PERFORM assert_negative_sql(
+        44, 'Student admission_number global uniqueness enforcement', 'DB-ENFORCED',
+        'INSERT INTO students (admission_number, student_name) VALUES (''ADM-VAL-001'', ''Duplicate Admission Student'');',
+        '23505',
+        'Duplicate admission_number rejected by uk_students_admission_number'
+    );
+
+    PERFORM assert_negative_sql(
+        45, 'Student admission_number max length 50 enforcement', 'DB-ENFORCED',
+        'INSERT INTO students (admission_number, student_name) VALUES (''ADM-VAL-123456789012345678901234567890123456789012345678901'', ''Too Long Admission'');',
+        '22001',
+        'Admission number exceeding 50 chars rejected by VARCHAR(50)'
+    );
+
+    INSERT INTO students (admission_number, student_name) VALUES ('ADM-VAL-003', 'Third Valid Student') RETURNING id INTO v_student3_id;
+    PERFORM record_result(46, 'Valid unique admission_number accepted', 'DB-ENFORCED', 'POSITIVE', 'PASS', 'Student with unique admission_number ADM-VAL-003 created successfully');
+
+    -- =========================================================================
+    -- SCENARIO 47: Subject Name Non-Uniqueness (DEC-074)
+    -- Same Subject Name may exist with different Subject Codes
+    -- =========================================================================
+    INSERT INTO subjects (name, code, category) VALUES ('Applied Mathematics', 'AMAT-01', 'elective');
+    INSERT INTO subjects (name, code, category) VALUES ('Applied Mathematics', 'AMAT-02', 'elective');
+    PERFORM record_result(47, 'Subject name non-uniqueness (same name, distinct codes)', 'DB-ENFORCED', 'POSITIVE', 'PASS', 'Two subjects with identical name "Applied Mathematics" and distinct codes "AMAT-01" / "AMAT-02" created successfully');
+
+    -- =========================================================================
+    -- SCENARIO 48: Subject Code Global Uniqueness (DEC-074)
+    -- =========================================================================
+    PERFORM assert_negative_sql(
+        48, 'Subject code uniqueness enforcement', 'DB-ENFORCED',
+        'INSERT INTO subjects (name, code, category) VALUES (''Advanced Mathematics'', ''AMAT-01'', ''elective'');',
+        '23505',
+        'Duplicate subject code AMAT-01 rejected by uk_subjects_code'
+    );
+
+    -- =========================================================================
+    -- SCENARIO 49: At Most One Active Term Per Academic Year (DEC-075)
+    -- =========================================================================
+    UPDATE terms SET is_active = TRUE WHERE id = v_term1_id;
+    PERFORM record_result(49, 'Single active term permitted in academic year', 'DB-ENFORCED', 'POSITIVE', 'PASS', 'Term 1 successfully marked active in academic year 2026/27');
+
+    PERFORM assert_negative_sql(
+        49, 'Multiple active terms in same academic year rejected', 'DB-ENFORCED',
+        'UPDATE terms SET is_active = TRUE WHERE id = ' || v_term2_id || ';',
+        '23505',
+        'Second active term in same academic year rejected by uk_terms_one_active_per_year'
+    );
+
+    -- =========================================================================
+    -- SCENARIO 50: Independent Active Terms Across Distinct Academic Years
+    -- =========================================================================
+    INSERT INTO academic_years (name, start_date, end_date, status, is_current)
+    VALUES ('2027/28', '2027-04-01', '2028-03-31', 'open', FALSE)
+    RETURNING id INTO v_ay2_id;
+
+    INSERT INTO terms (academic_year_id, name, sequence_no, is_active)
+    VALUES (v_ay2_id, 'Term 1 (2027/28)', 1, TRUE)
+    RETURNING id INTO v_term_ay2_id;
+
+    PERFORM record_result(50, 'Independent active terms in different academic years', 'DB-ENFORCED', 'POSITIVE', 'PASS', 'Academic Year 2027/28 active Term 1 coexists with 2026/27 active Term 1 without conflict');
+
+    -- =========================================================================
+    -- SCENARIO 51: Term Sequence Ordering Integrity
+    -- =========================================================================
+    PERFORM assert_negative_sql(
+        51, 'Duplicate term sequence_no in same academic year rejected', 'DB-ENFORCED',
+        'INSERT INTO terms (academic_year_id, name, sequence_no, is_active) VALUES (' || v_ay2_id || ', ''Term 2 Invalid'', 1, FALSE);',
+        '23505',
+        'Duplicate sequence_no 1 in Academic Year 2027/28 rejected by uk_terms_year_seq'
+    );
 
 END $$;
 

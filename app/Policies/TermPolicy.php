@@ -29,6 +29,11 @@ class TermPolicy
 
     public function delete(User $user, Term $term): bool
     {
-        return $user->isAdmin();
+        return $user->isAdmin() || $user->isOfficeStaff();
+    }
+
+    public function reorder(User $user): bool
+    {
+        return $user->isAdmin() || $user->isOfficeStaff();
     }
 }

@@ -24,42 +24,54 @@ class AcademicYearPolicy
     }
 
     /**
-     * Determine whether the user can create academic years (Administrator only).
+     * Determine whether the user can create academic years.
      */
     public function create(User $user): bool
     {
-        return $user->isAdmin();
+        return $user->isAdmin() || $user->isOfficeStaff();
     }
 
     /**
-     * Determine whether the user can update the academic year (Administrator only).
+     * Determine whether the user can update the academic year.
      */
     public function update(User $user, AcademicYear $academicYear): bool
     {
-        return $user->isAdmin();
+        return $user->isAdmin() || $user->isOfficeStaff();
     }
 
     /**
-     * Determine whether the user can close the academic year (Administrator only).
+     * Determine whether the user can close the academic year.
      */
     public function close(User $user, AcademicYear $academicYear): bool
     {
-        return $user->isAdmin();
+        return $user->isAdmin() || $user->isOfficeStaff();
     }
 
     /**
-     * Determine whether the user can reopen the academic year (Administrator only).
+     * Determine whether the user can reopen the academic year.
      */
     public function reopen(User $user, AcademicYear $academicYear): bool
     {
-        return $user->isAdmin();
+        return $user->isAdmin() || $user->isOfficeStaff();
     }
 
     /**
-     * Determine whether the user can delete the academic year (Administrator only).
+     * Determine whether the user can delete the academic year.
      */
     public function delete(User $user, AcademicYear $academicYear): bool
     {
-        return $user->isAdmin();
+        return $user->isAdmin() || $user->isOfficeStaff();
+    }
+
+    /**
+     * Determine whether the academic year's academic contents/setup can be configured.
+     */
+    public function configure(User $user, AcademicYear $academicYear): bool
+    {
+        if (! ($user->isAdmin() || $user->isOfficeStaff())) {
+            return false;
+        }
+
+        return $academicYear->isConfigurationWindowOpen();
     }
 }

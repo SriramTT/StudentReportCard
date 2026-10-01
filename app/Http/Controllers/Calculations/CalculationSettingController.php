@@ -27,7 +27,7 @@ class CalculationSettingController extends Controller
         Gate::authorize('viewAny', CalculationSetting::class);
 
         $academicYears = AcademicYear::orderBy('start_date', 'desc')->get();
-        $classes = SchoolClass::where('is_active', true)->orderBy('name', 'asc')->get();
+        $classes = SchoolClass::getNaturallySorted(true);
 
         $selectedYearId = $request->query('academic_year_id', $academicYears->firstWhere('is_current', true)?->id ?? $academicYears->first()?->id);
 
@@ -35,7 +35,7 @@ class CalculationSettingController extends Controller
         if ($selectedYearId) {
             $query->where('academic_year_id', $selectedYearId);
         }
-        $settings = $query->get();
+        $settings = $query->get()->sortBy(fn ($s) => $s->schoolClass?->name ?? '', SORT_NATURAL)->values();
 
         return view('calculations.settings', [
             'settings' => $settings,
@@ -93,5 +93,29 @@ class CalculationSettingController extends Controller
 
         return redirect()->route('calculations.settings.index', ['academic_year_id' => $calculationSetting->academic_year_id])
             ->with('success', 'Calculation setting updated successfully.');
+    }
+
+    public function destroy(CalculationSetting $calculationSetting): RedirectResponse
+    {
+        Gate::authorize('delete', $calculationSetting);
+
+        $academicYearId = $calculationSetting->academic_year_id;
+        $beforeData = $calculationSetting->only(['academic_year_id', 'class_id', 'calculation_method']);
+        $settingId = $calculationSetting->id;
+
+        $calculationSetting->delete();
+
+        $this->auditService->logDomainAction(
+            userId: Auth::id(),
+            action: 'DELETE_CALCULATION_SETTING',
+            entityType: 'calculation_settings',
+            entityId: $settingId,
+            beforeData: $beforeData,
+            afterData: null,
+            description: "Deleted calculation setting for class ID {$beforeData['class_id']}"
+        );
+
+        return redirect()->route('calculations.settings.index', ['academic_year_id' => $academicYearId])
+            ->with('success', 'Calculation setting deleted successfully.');
     }
 }

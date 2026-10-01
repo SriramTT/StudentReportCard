@@ -9,7 +9,8 @@ class StoreReportAssessmentSelectionRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->isAdmin() || $this->user()?->isOfficeStaff();
+        $config = $this->route('reportConfiguration');
+        return $this->user()?->can('update', $config) ?? false;
     }
 
     public function rules(): array
@@ -29,4 +30,16 @@ class StoreReportAssessmentSelectionRequest extends FormRequest
             'is_displayed' => ['nullable', 'boolean'],
         ];
     }
+
+    public function withValidator($validator): void
+    {
+        $validator->after(function ($validator) {
+            /** @var \App\Models\ReportConfiguration|null $config */
+            $config = $this->route('reportConfiguration');
+            if ($config && $config->isMidTerm() && $config->assessmentSelections()->count() >= 1) {
+                $validator->errors()->add('assessment_id', 'Mid term Assessment configurations allow exactly one assessment. Remove the existing assessment before adding a new one, or use a Custom Report.');
+            }
+        });
+    }
 }
+

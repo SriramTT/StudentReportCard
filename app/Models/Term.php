@@ -42,6 +42,11 @@ class Term extends Model
         return $this->hasMany(Attendance::class, 'term_id');
     }
 
+    public function attendance(): HasMany
+    {
+        return $this->hasMany(Attendance::class, 'term_id');
+    }
+
     public function generatedReports(): HasMany
     {
         return $this->hasMany(GeneratedReport::class, 'term_id');

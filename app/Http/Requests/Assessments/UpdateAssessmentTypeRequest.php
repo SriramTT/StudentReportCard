@@ -9,7 +9,8 @@ class UpdateAssessmentTypeRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->isAdmin() || $this->user()?->isOfficeStaff();
+        $assessmentType = $this->route('assessmentType');
+        return $this->user()?->can('update', $assessmentType) ?? false;
     }
 
     public function rules(): array

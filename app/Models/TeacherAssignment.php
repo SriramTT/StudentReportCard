@@ -58,4 +58,20 @@ class TeacherAssignment extends Model
     {
         return $this->belongsTo(Subject::class, 'subject_id');
     }
+
+    /**
+     * Determine if this assignment row represents a Class Teacher assignment.
+     */
+    public function isClassTeacher(): bool
+    {
+        return $this->assignment_type === TeacherAssignmentType::CLASS_TEACHER;
+    }
+
+    /**
+     * Determine if this assignment row represents a Subject Teacher assignment.
+     */
+    public function isSubjectTeacher(): bool
+    {
+        return $this->assignment_type === TeacherAssignmentType::SUBJECT_TEACHER;
+    }
 }

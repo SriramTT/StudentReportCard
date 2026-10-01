@@ -29,6 +29,6 @@ class SchoolClassPolicy
 
     public function delete(User $user, SchoolClass $schoolClass): bool
     {
-        return $user->isAdmin();
+        return $user->isAdmin() || $user->isOfficeStaff();
     }
 }

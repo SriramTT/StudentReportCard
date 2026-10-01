@@ -69,4 +69,22 @@ class AcademicYearController extends Controller
         return redirect()->route('academic_years.index')
             ->with('success', 'Academic year reopened successfully.');
     }
+
+    public function destroy(AcademicYear $academicYear): RedirectResponse
+    {
+        Gate::authorize('delete', $academicYear);
+
+        try {
+            $this->academicYearService->deleteAcademicYear($academicYear);
+        } catch (\DomainException $e) {
+            return redirect()->route('academic_years.index')
+                ->with('error', $e->getMessage());
+        } catch (\Illuminate\Database\QueryException $e) {
+            return redirect()->route('academic_years.index')
+                ->with('error', 'This academic year cannot be removed because it is referenced by existing academic data.');
+        }
+
+        return redirect()->route('academic_years.index')
+            ->with('success', 'Academic year removed successfully.');
+    }
 }

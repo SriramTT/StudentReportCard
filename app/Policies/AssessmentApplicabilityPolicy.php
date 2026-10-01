@@ -29,6 +29,6 @@ class AssessmentApplicabilityPolicy
 
     public function delete(User $user, AssessmentApplicability $applicability): bool
     {
-        return $user->isAdmin();
+        return $user->isAdmin() || $user->isOfficeStaff();
     }
 }

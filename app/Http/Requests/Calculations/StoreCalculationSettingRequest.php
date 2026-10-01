@@ -9,7 +9,7 @@ class StoreCalculationSettingRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->isAdmin() || $this->user()?->isOfficeStaff();
+        return $this->user()?->can('create', \App\Models\CalculationSetting::class) ?? false;
     }
 
     public function rules(): array

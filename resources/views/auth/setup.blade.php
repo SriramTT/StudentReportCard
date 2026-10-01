@@ -68,13 +68,14 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="email" class="form-label">Email Address (Optional)</label>
+                    <label for="email" class="form-label">Email Address <span style="color: var(--color-danger);">*</span></label>
                     <input
                         type="email"
                         id="email"
                         name="email"
                         class="form-control @error('email') is-invalid @enderror"
                         value="{{ old('email') }}"
+                        required
                         autocomplete="email"
                         maxlength="255"
                     >

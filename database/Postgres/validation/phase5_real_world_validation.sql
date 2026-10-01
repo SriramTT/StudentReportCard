@@ -4,11 +4,14 @@
 -- Target: PostgreSQL 15+
 -- =============================================================================
 
--- Target database: school_report_card
--- PostgreSQL-native port of the realistic classroom validation suite:
--- Class 8A (40 students, 8 subjects, 7 assessments, 280 allocations, 40 marks),
--- transfer history, 4 terms, 10 unit tests, audit trail diffs, attendance,
--- revisions, teacher scopes, and cross-reference integrity invariants.
+-- Target database: school_report_card_audit (Dedicated validation database)
+-- Safety Guard:
+DO $$
+BEGIN
+    IF current_database() = 'school_report_card' THEN
+        RAISE EXCEPTION 'CRITICAL SAFETY GUARD TRIGGERED: Validation suite contains teardown scripts and cannot be executed against persistent application database ''school_report_card''. Please target dedicated test/validation database ''school_report_card_audit''.';
+    END IF;
+END $$;
 
 -- -----------------------------------------------------------------------------
 -- 1. SETUP PHASE 5 RESULTS TABLE & PROCEDURES
@@ -240,7 +243,7 @@ BEGIN
 
     i := 1;
     WHILE i <= 40 LOOP
-        INSERT INTO students (student_name) VALUES ('Student ' || LPAD(i::text, 2, '0'))
+        INSERT INTO students (admission_number, student_name) VALUES ('ADM-RW-' || LPAD(i::text, 3, '0'), 'Student ' || LPAD(i::text, 2, '0'))
         RETURNING id INTO new_student_id;
         
         INSERT INTO student_academic_records 

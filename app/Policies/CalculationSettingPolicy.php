@@ -29,6 +29,6 @@ class CalculationSettingPolicy
 
     public function delete(User $user, CalculationSetting $calculationSetting): bool
     {
-        return $user->isAdmin();
+        return $user->isAdmin() || $user->isOfficeStaff();
     }
 }

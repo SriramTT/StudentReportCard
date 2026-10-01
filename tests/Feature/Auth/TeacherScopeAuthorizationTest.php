@@ -315,14 +315,17 @@ class TeacherScopeAuthorizationTest extends TestCase
 
         // Students & Records
         $student1 = Student::forceCreate([
+            'admission_number' => 'ADM_TS_001',
             'student_name' => 'Student EightA',
         ]);
 
         $student2 = Student::forceCreate([
+            'admission_number' => 'ADM_TS_002',
             'student_name' => 'Student EightB',
         ]);
 
         $student3 = Student::forceCreate([
+            'admission_number' => 'ADM_TS_003',
             'student_name' => 'Student NineA',
         ]);
 

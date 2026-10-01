@@ -35,6 +35,20 @@ class AssessmentService
                 }
             }
 
+            $academicYear = \App\Models\AcademicYear::findOrFail($academicYearId);
+
+            if (! empty($data['assessment_date'])) {
+                $startDate = $academicYear->start_date instanceof \Carbon\CarbonInterface ? $academicYear->start_date->format('Y-m-d') : substr((string)$academicYear->start_date, 0, 10);
+                $endDate = $academicYear->end_date instanceof \Carbon\CarbonInterface ? $academicYear->end_date->format('Y-m-d') : substr((string)$academicYear->end_date, 0, 10);
+                $dateStr = substr((string)$data['assessment_date'], 0, 10);
+
+                if ($dateStr < $startDate || $dateStr > $endDate) {
+                    throw ValidationException::withMessages([
+                        'assessment_date' => ["The assessment date must fall within the academic year dates ({$startDate} to {$endDate})."],
+                    ]);
+                }
+            }
+
             $assessment = Assessment::create([
                 'academic_year_id' => $academicYearId,
                 'term_id' => $termId,
@@ -81,6 +95,37 @@ class AssessmentService
                 }
             }
 
+            // Reject structural changes if dependent marks or generated reports exist
+            $isStructuralChanged = ($termId !== $assessment->term_id)
+                || (isset($data['assessment_type_id']) && (int) $data['assessment_type_id'] !== $assessment->assessment_type_id);
+
+            if ($isStructuralChanged) {
+                $hasDependentData = \App\Models\Mark::whereIn(
+                    'assessment_applicability_id',
+                    $assessment->applicabilities()->pluck('id')
+                )->exists() || $assessment->generatedReports()->exists();
+
+                if ($hasDependentData) {
+                    throw ValidationException::withMessages([
+                        'term_id' => ['Cannot alter assessment term or assessment type because dependent marks or generated reports already exist for this assessment.'],
+                    ]);
+                }
+            }
+
+            $academicYear = $assessment->academicYear;
+            $newDate = array_key_exists('assessment_date', $data) ? $data['assessment_date'] : $assessment->assessment_date;
+            if (! empty($newDate) && $academicYear) {
+                $startDate = $academicYear->start_date instanceof \Carbon\CarbonInterface ? $academicYear->start_date->format('Y-m-d') : substr((string)$academicYear->start_date, 0, 10);
+                $endDate = $academicYear->end_date instanceof \Carbon\CarbonInterface ? $academicYear->end_date->format('Y-m-d') : substr((string)$academicYear->end_date, 0, 10);
+                $dateStr = substr((string)$newDate, 0, 10);
+
+                if ($dateStr < $startDate || $dateStr > $endDate) {
+                    throw ValidationException::withMessages([
+                        'assessment_date' => ["The assessment date must fall within the academic year dates ({$startDate} to {$endDate})."],
+                    ]);
+                }
+            }
+
             $assessment->update([
                 'term_id' => $termId,
                 'assessment_type_id' => isset($data['assessment_type_id']) ? (int) $data['assessment_type_id'] : $assessment->assessment_type_id,
@@ -102,6 +147,45 @@ class AssessmentService
             );
 
             return $assessment;
+        });
+    }
+
+    /**
+     * Delete an Assessment if completely unused (no applicabilities, selections, or reports).
+     *
+     * @throws \DomainException
+     */
+    public function deleteAssessment(Assessment $assessment): void
+    {
+        if (
+            $assessment->applicabilities()->exists() ||
+            $assessment->reportSelections()->exists() ||
+            $assessment->generatedReports()->exists()
+        ) {
+            throw new \DomainException('This assessment cannot be removed because it has configured subject applicabilities, report selections, or generated report cards. Deactivate it instead.');
+        }
+
+        DB::transaction(function () use ($assessment) {
+            $beforeData = [
+                'id' => $assessment->id,
+                'academic_year_id' => $assessment->academic_year_id,
+                'term_id' => $assessment->term_id,
+                'assessment_type_id' => $assessment->assessment_type_id,
+                'name' => $assessment->name,
+                'status' => $assessment->status->value,
+            ];
+
+            $assessment->delete();
+
+            $this->auditService->logDomainAction(
+                userId: Auth::id(),
+                action: 'DELETE_ASSESSMENT',
+                entityType: 'assessments',
+                entityId: $beforeData['id'],
+                beforeData: $beforeData,
+                afterData: null,
+                description: 'Permanently removed assessment: ' . $beforeData['name']
+            );
         });
     }
 }

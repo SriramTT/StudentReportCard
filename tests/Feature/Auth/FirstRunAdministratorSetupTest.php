@@ -24,6 +24,10 @@ class FirstRunAdministratorSetupTest extends TestCase
     {
         parent::setUp();
 
+        if (DB::connection()->getDatabaseName() === 'school_report_card') {
+            $this->fail("CRITICAL SAFETY BREACH: FirstRunAdministratorSetupTest must NEVER execute against persistent application database 'school_report_card'.");
+        }
+
         // Clear any dependent transactional records and users to guarantee true zero-user state
         AuditLog::query()->delete();
         DB::table('teacher_assignments')->delete();
@@ -186,12 +190,13 @@ class FirstRunAdministratorSetupTest extends TestCase
         $response = $this->from('/setup')->post('/setup', [
             'username' => '',
             'display_name' => '',
+            'email' => '',
             'password' => 'short',
             'password_confirmation' => 'mismatch',
         ]);
 
         $response->assertRedirect('/setup');
-        $response->assertSessionHasErrors(['username', 'display_name', 'password']);
+        $response->assertSessionHasErrors(['username', 'display_name', 'email', 'password']);
         $this->assertEquals(0, User::count());
     }
 
@@ -201,6 +206,7 @@ class FirstRunAdministratorSetupTest extends TestCase
         $firstResponse = $this->post('/setup', [
             'username' => 'first_admin',
             'display_name' => 'First Admin',
+            'email' => 'first_admin@school.test',
             'password' => 'SecurePass123!',
             'password_confirmation' => 'SecurePass123!',
         ]);
@@ -213,6 +219,7 @@ class FirstRunAdministratorSetupTest extends TestCase
         $secondResponse = $this->post('/setup', [
             'username' => 'second_user',
             'display_name' => 'Second User',
+            'email' => 'second_user@school.test',
             'password' => 'SecurePass123!',
             'password_confirmation' => 'SecurePass123!',
         ]);
@@ -251,6 +258,7 @@ class FirstRunAdministratorSetupTest extends TestCase
         $this->post('/setup', [
             'username' => 'deactivated_admin',
             'display_name' => 'Deactivated Admin',
+            'email' => 'deactivated_admin@school.test',
             'password' => 'SecurePass123!',
             'password_confirmation' => 'SecurePass123!',
         ]);
@@ -274,6 +282,7 @@ class FirstRunAdministratorSetupTest extends TestCase
         $postResponse = $this->post('/setup', [
             'username' => 'another_admin',
             'display_name' => 'Another Admin',
+            'email' => 'another_admin@school.test',
             'password' => 'SecurePass123!',
             'password_confirmation' => 'SecurePass123!',
         ]);

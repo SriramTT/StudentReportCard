@@ -85,7 +85,7 @@ calculation_settings, report_configurations, report_assessment_selections,
 school_settings, generated_reports, audit_logs.
 ```
 
-- ❌ **NO Student Admission Numbers:** The system does NOT support student admission numbers, registration codes, or alphanumeric student IDs. Master student identity is defined by `students.student_name` and internal primary key `students.id`. Classroom placement identity is defined by `student_academic_records.roll_number`. Filenames, PDF views, assertions, and test fixtures must never assert or reference an invented admission number.
+- ❌ **NO Student Admission Numbers (Pre-Phase 10 Baseline):** In the pre-Phase 10 baseline, admission numbers were prohibited. Under DEC-072 in Phase 10, `students.admission_number` (`VARCHAR(50) NOT NULL UNIQUE`) was approved as the unique student business identifier. Test fixtures, imports, and directory assertions in Phase 10 now require valid unique admission numbers, while demographic fields remain strictly prohibited.
 - ❌ **NO Invented Demographics:** No date of birth, gender, guardian/parent names, home address, contact telephone, email, or student photographs may be asserted or displayed.
 - ❌ **NO Batch PDF Generation:** The application does NOT support bulk classroom exports, ZIP archives, or background class-wide queues (explicitly deferred in BRD Section 4). Report generation testing is strictly per-student.
 - ❌ **NO Unapproved Academic Metrics:** Tests must strictly fail if annual overall percentages (BR-064), student rankings (BR-065), GPA calculations, grade bands (BR-067), or automatic promotion statuses appear in output.
@@ -216,7 +216,7 @@ Base Academic Year (2025-26, Status: Open)
 ## 9. Database Integrity & Relational Invariants Test Suite
 
 `DB-REG-001` through `DB-REG-008` assert that PostgreSQL schema integrity matches `schema.sql`:
-- **`DB-REG-001` (Strict 23-Table Schema Invariant):** Asserts that `information_schema.tables` in schema `public` contains **exactly 23 approved base tables**. Asserts zero unapproved tables (no permission/ACL tables, no workflow tables, no PDF metadata tables, no tenant tables) and zero unapproved columns (no `file_hash`, `file_size`, `status`, `deleted_at`, `tenant_id`, `admission_number`, or unapproved student fields).
+- **`DB-REG-001` (Strict 23-Table Schema Invariant):** Asserts that `information_schema.tables` in schema `public` contains **exactly 23 approved base tables**. Asserts zero unapproved tables (no permission/ACL tables, no workflow tables, no PDF metadata tables, no tenant tables) and zero unapproved columns (no `file_hash`, `file_size`, `status`, `deleted_at`, `tenant_id`, or unapproved demographic student fields; `students.admission_number` approved under DEC-072).
 - **`DB-REG-002` (Revision Identity Functional Index):** Asserts index `uk_gr_revision_identity` exists on `(student_academic_record_id, report_type, COALESCE(term_id, 0), COALESCE(assessment_id, 0), revision_number)`.
 - **`DB-REG-003` (Roll Number Uniqueness Index):** Asserts index `uk_sar_active_roll_identity` prevents duplicate roll numbers in the same class/section over overlapping effective dates.
 - **`DB-REG-004` (Attendance CHECK Constraint):** Direct SQL insertion of `days_attended > total_working_days` fails with `chk_att_days_consistent`.
@@ -500,9 +500,9 @@ $$\text{Percentage} = \frac{\sum \text{Marks Obtained}}{\sum \text{Maximum Marks
 
 `IMPORT-001` through `IMPORT-004` test CSV ingestion:
 - **`IMPORT-001` (Clean Ingestion):** Valid CSV creates `students` and `student_academic_records` rows.
-- **`IMPORT-002` (Re-Import Behavior - CL-009):** Re-importing creates new student master records; zero automatic matching is performed.
-- **`IMPORT-003` (Duplicate Roll Number Abort):** Two identical roll numbers in the same class/section abort the import transaction.
-- **`IMPORT-004` (Zero Admission Number Column):** Importer ignores any unexpected columns such as `admission_number`.
+- **`IMPORT-002` (Identity Matching Behavior - DEC-072):** New admission numbers create master students; existing admission numbers with matching names reuse existing student master rows without creating duplicates; name mismatches reject the row.
+- **`IMPORT-003` (Duplicate Roll Number Abort):** Two identical roll numbers in the same class/section abort the placement transaction.
+- **`IMPORT-004` (Admission Number Required - DEC-072):** Importer requires `admission_number,student_name,roll_number`. Missing/blank admission numbers are rejected; in-file duplicate admission numbers are rejected.
 
 ---
 
@@ -566,7 +566,7 @@ The visual test suite inspects:
 | `sections` | Academic-year scoped class sections; unique name | `DB-REG-001`, `E2E-FULL-001` |
 | `subjects` | Master catalogue; unique lowercase name index | `DB-REG-001`, `E2E-FULL-001` |
 | `class_subjects` | Functional unique index for nullable section; snapshot names | `REPORT-REV-004`, `DB-REG-001` |
-| `students` | Master records; non-unique names; zero admission numbers | `DOMAIN-IMP-001`, `DB-REG-001` |
+| `students` | Master records; admission_number unique identifier (DEC-072) | `DOMAIN-IMP-001`, `DB-REG-001` |
 | `student_academic_records` | Historical placement immutability; active roll uniqueness | `DOMAIN-TRANS-001`, `DB-REG-003` |
 | `student_subject_allocations` | Elective allocations; locked once marks exist | `DOMAIN-ELEC-001`, `DOMAIN-ELEC-002` |
 | `assessment_types` | Master types (`class_test`, `term_exam`); unique code | `DOMAIN-CALC-003`, `DB-REG-001` |
@@ -617,7 +617,7 @@ A build cannot merge or deploy without passing all 23 Quality Gates in sequence:
 
 | Gate ID | Gate Title | Scope of Gate | Automated Verification Method | Expected Result | Blocking Failure Condition | Severity | Evidence Required |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **GATE A** | **Domain Correctness** | BRD V1.3 business boundaries | Code scanner + Model tests | 0 invented fields | Admission number or demographic detected | Critical | Static scan log |
+| **GATE A** | **Domain Correctness** | BRD V1.3 & DEC-072 boundaries | Code scanner + Model tests | 0 unapproved fields | Unapproved demographic fields detected | Critical | Static scan log |
 | **GATE B** | **Database Integrity** | 23 tables, CHECKs, unique indexes | PostgreSQL integration suite | 100% schema match | Schema discrepancy or constraint failure | Blocker | DBUnit report |
 | **GATE C** | **Authorization Scopes** | Teacher assignment scopes | Feature policy test suite | Scopes enforced | Subject Teacher edits unauthorized mark | Blocker | Auth matrix log |
 | **GATE D** | **Mark-State Invariants** | Ternary mark states | Unit test suite | 0 != blank != A | Mark coercion (blank $\to$ 0) | Blocker | Invariant report |
@@ -658,7 +658,7 @@ The occurrence of **any single condition** below constitutes an immediate, uncon
 9. ❌ A `generated_reports` database row exists pointing to a nonexistent physical file.
 10. ❌ A physical PDF file exists on disk without a corresponding `generated_reports` row following commit.
 11. ❌ Direct public URL access to reports is possible via the web server.
-12. ❌ An admission number, student registration code, date of birth, gender, parent name, or student photograph appears in the PDF or UI.
+12. ❌ An unapproved student registration code, date of birth, gender, parent name, or student photograph appears in the PDF or UI (`students.admission_number` approved per DEC-072).
 13. ❌ An annual overall percentage, student rank, GPA score, or grade band appears in any calculation or report.
 14. ❌ The system relies on a hardcoded assumption of 3 terms or universal 100 maximum marks.
 15. ❌ Client-side JavaScript calculations override server-side calculations.
@@ -731,7 +731,7 @@ In accordance with Section 30 and 32 of the Master Verification instructions, th
 ```text
 [Specified / Ready for Verification]  1. All critical contradictions across Phases 6.1 through 6.8 resolved in place.
 [Specified / Ready for Verification]  2. Absolute 23-table schema boundaries enforced; zero schema modifications permitted.
-[Specified / Ready for Verification]  3. Admission numbers, DOB, gender, parent names, and photos strictly prohibited.
+[Specified / Ready for Verification]  3. Unapproved DOB, gender, parent names, and photos strictly prohibited (`students.admission_number` approved per DEC-072).
 [Specified / Ready for Verification]  4. Mark ternary separation asserted (0.00 != blank != absent).
 [Specified / Ready for Verification]  5. Exact decimal arithmetic asserted; parseFloat() eliminated from validation.
 [Specified / Ready for Verification]  6. Dual calculation formulas and Term Exam exclusive contribution specified.

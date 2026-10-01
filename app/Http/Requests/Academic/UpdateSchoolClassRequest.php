@@ -9,7 +9,8 @@ class UpdateSchoolClassRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->isAdmin() || $this->user()?->isOfficeStaff();
+        $schoolClass = $this->route('schoolClass');
+        return $this->user()?->can('update', $schoolClass) ?? false;
     }
 
     public function rules(): array

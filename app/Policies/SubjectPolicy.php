@@ -29,6 +29,6 @@ class SubjectPolicy
 
     public function delete(User $user, Subject $subject): bool
     {
-        return $user->isAdmin();
+        return $user->isAdmin() || $user->isOfficeStaff();
     }
 }

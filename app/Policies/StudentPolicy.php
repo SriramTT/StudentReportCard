@@ -2,6 +2,7 @@
 
 namespace App\Policies;
 
+use App\Enums\StudentPlacementStatus;
 use App\Models\Student;
 use App\Models\User;
 use App\Services\TeacherAuthorizationService;
@@ -22,6 +23,7 @@ class StudentPolicy
 
     /**
      * Determine whether the user can view the specific student.
+     * Enforces active placement within the teacher's assigned classroom.
      */
     public function view(User $user, Student $student): bool
     {
@@ -30,8 +32,11 @@ class StudentPolicy
         }
 
         // For teachers: verify student has active academic record in an assigned classroom
-        $academicRecords = $student->academicRecords;
-        foreach ($academicRecords as $record) {
+        $activeRecords = $student->academicRecords()
+            ->where('status', StudentPlacementStatus::ACTIVE)
+            ->get();
+
+        foreach ($activeRecords as $record) {
             if ($this->teacherAuth->userCanAccessClassSection($user, $record->academic_year_id, $record->class_id, $record->section_id)) {
                 return true;
             }
@@ -57,10 +62,35 @@ class StudentPolicy
     }
 
     /**
-     * Hard deletion is strictly prohibited (TH-12, Section 27).
+     * Determine whether the user can transfer the student internally or change placement.
+     */
+    public function transfer(User $user, Student $student): bool
+    {
+        return $user->isAdmin() || $user->isOfficeStaff();
+    }
+
+    /**
+     * Determine whether the user can import students from CSV.
+     */
+    public function import(User $user): bool
+    {
+        return $user->isAdmin() || $user->isOfficeStaff();
+    }
+
+    /**
+     * Determine whether the user can manage student subject allocations.
+     */
+    public function updateAllocation(User $user, Student $student): bool
+    {
+        return $user->isAdmin() || $user->isOfficeStaff();
+    }
+
+    /**
+     * Determine whether the user can permanently delete an unused student.
+     * Deletion is restricted to Admin and Office Staff, and blocked server-side if historical records exist.
      */
     public function delete(User $user, Student $student): bool
     {
-        return false;
+        return $user->isAdmin() || $user->isOfficeStaff();
     }
 }

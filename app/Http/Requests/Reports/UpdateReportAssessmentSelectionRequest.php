@@ -8,7 +8,8 @@ class UpdateReportAssessmentSelectionRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->isAdmin() || $this->user()?->isOfficeStaff();
+        $config = $this->route('reportConfiguration');
+        return $this->user()?->can('update', $config) ?? false;
     }
 
     public function rules(): array

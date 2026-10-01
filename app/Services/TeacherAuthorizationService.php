@@ -26,6 +26,7 @@ class TeacherAuthorizationService
         $today = now()->toDateString();
 
         $query = TeacherAssignment::query()
+            ->with(['schoolClass', 'section'])
             ->where('user_id', $user->id)
             ->where('is_active', true)
             ->where('effective_from', '<=', $today)
@@ -39,6 +40,77 @@ class TeacherAuthorizationService
         }
 
         return $query->get();
+    }
+
+    /**
+     * Get the authorized classes for a user within an optional academic year context.
+     * For Administrator and Office Staff: returns all active classes naturally sorted.
+     * For Teachers: returns only classes for which the user has active teacher assignments.
+     *
+     * @param  User  $user
+     * @param  int|null  $academicYearId
+     * @return Collection<int, \App\Models\SchoolClass>
+     */
+    public function getAuthorizedClasses(User $user, ?int $academicYearId = null): Collection
+    {
+        if ($user->isAdmin() || $user->isOfficeStaff()) {
+            return \App\Models\SchoolClass::getNaturallySorted(false);
+        }
+
+        $activeAssignments = $this->getActiveAssignments($user, $academicYearId);
+        $authorizedClassIds = $activeAssignments->pluck('class_id')->unique()->filter()->values()->all();
+
+        if (empty($authorizedClassIds)) {
+            return new Collection();
+        }
+
+        return \App\Models\SchoolClass::getNaturallySorted(false, $authorizedClassIds);
+    }
+
+    /**
+     * Get the authorized sections for a user within an optional academic year context.
+     * For Administrator and Office Staff: returns all sections with schoolClass.
+     * For Teachers: returns only sections for which the user has active teacher assignments.
+     *
+     * @param  User  $user
+     * @param  int|null  $academicYearId
+     * @return Collection<int, \App\Models\Section>
+     */
+    public function getAuthorizedSections(User $user, ?int $academicYearId = null): Collection
+    {
+        if ($user->isAdmin() || $user->isOfficeStaff()) {
+            return \App\Models\Section::with('schoolClass')->orderBy('name', 'asc')->get();
+        }
+
+        $activeAssignments = $this->getActiveAssignments($user, $academicYearId);
+        $authorizedSectionIds = $activeAssignments->pluck('section_id')->unique()->filter()->values()->all();
+
+        if (empty($authorizedSectionIds)) {
+            return new Collection();
+        }
+
+        return \App\Models\Section::query()
+            ->with('schoolClass')
+            ->whereIn('id', $authorizedSectionIds)
+            ->orderBy('name', 'asc')
+            ->get();
+    }
+
+    /**
+     * Check if a specific class and section combination is within the teacher's active assignments.
+     * For Administrator and Office Staff: returns true.
+     */
+    public function isAuthorizedClassSectionCombination(User $user, int $classId, int $sectionId, ?int $academicYearId = null): bool
+    {
+        if ($user->isAdmin() || $user->isOfficeStaff()) {
+            return true;
+        }
+
+        $activeAssignments = $this->getActiveAssignments($user, $academicYearId);
+
+        return $activeAssignments->contains(function ($assignment) use ($classId, $sectionId) {
+            return (int) $assignment->class_id === $classId && (int) $assignment->section_id === $sectionId;
+        });
     }
 
     /**
@@ -62,13 +134,20 @@ class TeacherAuthorizationService
             ->where('user_id', $user->id)
             ->where('academic_year_id', $academicYearId)
             ->where('class_id', $classId)
-            ->where('section_id', $sectionId)
             ->where('is_active', true)
             ->where('effective_from', '<=', $today)
             ->where(function ($q) use ($today) {
                 $q->whereNull('effective_to')
                   ->orWhere('effective_to', '>=', $today);
             });
+
+        $targetSection = \App\Models\Section::find($sectionId);
+        $query->where(function ($secQ) use ($sectionId, $targetSection) {
+            $secQ->where('section_id', $sectionId);
+            if ($targetSection) {
+                $secQ->orWhereHas('section', fn($sq) => $sq->where('name', $targetSection->name));
+            }
+        });
 
         if ($subjectId !== null) {
             $query->where(function ($q) use ($subjectId) {
@@ -212,6 +291,36 @@ class TeacherAuthorizationService
     }
 
     /**
+     * Check if user can edit marks in a given academic, classroom, and subject context.
+     * Enforces closed-year read-only restriction for teachers while preserving admin/office correction.
+     */
+    public function userCanEditMarksInContext(
+        User $user,
+        int $academicYearId,
+        int $classId,
+        int $sectionId,
+        int $subjectId
+    ): bool {
+        if ($user->isAdmin() || $user->isOfficeStaff()) {
+            return true;
+        }
+
+        // Closed academic year rule: teachers are read-only
+        $academicYear = AcademicYear::query()->find($academicYearId);
+        if ($academicYear?->status === AcademicYearStatus::CLOSED) {
+            return false;
+        }
+
+        return $this->isAuthorized(
+            $user,
+            $academicYearId,
+            $classId,
+            $sectionId,
+            $subjectId
+        );
+    }
+
+    /**
      * Check if user can edit an attendance record.
      * Subject teachers have no attendance authority.
      * Class teachers have authority only within assigned classroom during open academic years.
@@ -254,11 +363,6 @@ class TeacherAuthorizationService
     ): bool {
         if ($user->isAdmin() || $user->isOfficeStaff()) {
             return true;
-        }
-
-        $academicYear = AcademicYear::query()->find($academicYearId);
-        if ($academicYear?->status === AcademicYearStatus::CLOSED) {
-            return false;
         }
 
         return $this->isClassTeacherFor($user, $academicYearId, $classId, $sectionId);

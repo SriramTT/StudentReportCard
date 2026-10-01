@@ -93,7 +93,7 @@ All requirements, constraints, and operational workflows specified herein derive
 To prevent architectural drift and scope creep, the following boundaries are permanently enforced:
 
 - ❌ **NO Database Modifications:** Exactly 23 tables exist. No new columns (such as `file_hash`, `file_size`, `status`, `deleted_at`) may be added to `generated_reports` or any other table.
-- ❌ **NO Student Admission Numbers:** The system does not possess admission numbers, student codes, or registration IDs. Master student identity is defined by `students.student_name` and internal primary key `students.id`. Placement identity is defined by `student_academic_records.roll_number`. Filenames and report headers must never reference an invented admission number.
+- ❌ **NO Student Admission Numbers (Pre-Phase 10 Baseline):** The pre-Phase 10 baseline prohibited admission numbers. Under DEC-072 in Phase 10, `admission_number` was approved as the unique business identifier on `students`. However, storage paths and generated report revisions continue to rely on database relational PKs and structured tokens to avoid path instability. Filenames and report headers remain consistent with approved report templates.
 - ❌ **NO Invented Demographics:** No date of birth, gender, parent names, address, or student photos may be added to report cards.
 - ❌ **NO Batch PDF Generation:** The system does NOT support batch classroom PDF generation, bulk zip archives, or school-wide export queues (explicitly deferred in BRD Section 4). Report generation is strictly per-student.
 - ❌ **NO Unapproved Metrics:** No overall annual percentages (BR-064), student rankings (BR-065), GPA scores, grade-band classifications (BR-067), or automatic promotion decisions.
@@ -745,7 +745,7 @@ The following architectural decisions are established for Phase 6.8 and recorded
 The Phase 6.8 architectural specification has been reconciled against all authoritative project constraints:
 
 - [x] **No Database Schema Changes:** Relational 23-table schema strictly preserved. Zero columns added to `generated_reports` or `school_settings`.
-- [x] **No Admission Number:** Admission number completely excluded from filenames, storage paths, PDF templates, and metadata.
+- [x] **No Admission Number (Pre-Phase 10 Baseline):** Admission number was completely excluded from Phase 6 PDF architecture; DEC-072 in Phase 10 introduced `admission_number` on `students` without altering report file storage paths.
 - [x] **Strict Ternary Mark Representation:** Blank rejects generation; Numeric is bounded by contextual max marks; Absent displays as `A` and contributes $0.00$.
 - [x] **Dynamic Columns & Terms Supported:** Dynamic assessment columns rendered via `report_assessment_selections`; dynamic terms ($1 \dots N$) supported without hardcoding.
 - [x] **Immutable Revisions Preserved:** Revisions increment monotonically (`Revision 1`, `Revision 2`); existing PDFs are never overwritten or deleted.

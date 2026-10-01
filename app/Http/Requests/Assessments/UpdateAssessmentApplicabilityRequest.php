@@ -8,7 +8,8 @@ class UpdateAssessmentApplicabilityRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->isAdmin() || $this->user()?->isOfficeStaff();
+        $applicability = $this->route('applicability');
+        return $this->user()?->can('update', $applicability) ?? false;
     }
 
     public function rules(): array

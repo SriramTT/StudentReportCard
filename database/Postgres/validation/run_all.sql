@@ -4,8 +4,16 @@
 -- Target: PostgreSQL 15+ / psql
 -- =============================================================================
 -- Usage:
---   psql -U postgres -d school_report_card -f run_all.sql
+--   psql -U postgres -d school_report_card_audit -f run_all.sql
 -- =============================================================================
+
+-- Safety check: Prevent running destructive validation suite against persistent application DB
+DO $$
+BEGIN
+    IF current_database() = 'school_report_card' THEN
+        RAISE EXCEPTION 'CRITICAL SAFETY GUARD TRIGGERED: Validation suite contains teardown scripts and cannot be executed against persistent application database ''school_report_card''. Please target dedicated test/validation database ''school_report_card_audit''.';
+    END IF;
+END $$;
 
 \echo '============================================================================='
 \echo 'Starting School Report Card PostgreSQL Validation Master Suite'

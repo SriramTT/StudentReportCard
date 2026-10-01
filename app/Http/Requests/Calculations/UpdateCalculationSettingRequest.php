@@ -8,7 +8,8 @@ class UpdateCalculationSettingRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->isAdmin() || $this->user()?->isOfficeStaff();
+        $setting = $this->route('calculationSetting');
+        return $this->user()?->can('update', $setting) ?? false;
     }
 
     public function rules(): array

@@ -694,11 +694,18 @@ Student onboarding supports bulk CSV upload adhering to BRD V1.3 specifications.
 - Allowed Actors: `Administrator`, `Office Staff`.
 - Form Request: `App\Http\Requests\Students\StudentImportRequest`
   - Validates `file`: required, file, mimes:csv,txt, max:5120 (5MB).
-- Import Business Invariants (BRD V1.3):
-  1. Re-imported rows never overwrite existing students; each imported row creates a new master student (`students.student_name`) and placement record (`student_academic_records`). Re-import does NOT automatically match existing students.
-  2. Zero unapproved fields: Importer processes strictly `student_name`, `class_name`, `section_name`, `roll_number`, and `effective_from`. No admission number, registration code, or demographic matching mechanism exists.
-  3. Partial imports are supported: valid rows are inserted; invalid rows are skipped with row-level error reporting.
-  4. Response returns a summary Blade view listing: total rows processed, successful insertions, and a table of rejected rows with exact validation failure reasons.
+- Import Business Invariants (BRD V1.3 & DEC-072 Reconciliation):
+  1. **Historical Baseline (Pre-Phase 10):** Under original BRD V1.3 rules, admission numbers were prohibited and every CSV row created a new student master without identity matching.
+  2. **Approved Phase 10 Contract (DEC-072):** Formally superseding the prohibition, `admission_number` (`VARCHAR(50) NOT NULL UNIQUE`) is the unique student business identifier. Form upload supplies Academic Year, Class, and Section context. CSV contains `admission_number,student_name,roll_number`.
+  3. **Identity Matching Rules (DEC-072 Cases 1–6):**
+     - Case 1 (New Admission Number): Creates new student master and initial academic placement.
+     - Case 2 (Existing Admission Number, Matching Name): Reuses existing `students.id` master record; creates or confirms academic placement.
+     - Case 3 (Existing Admission Number, Mismatched Name): Row is rejected; existing master name is protected and never overwritten.
+     - Case 4 (Duplicate Admission Number in same CSV): Conflicting rows rejected with line numbers reported.
+     - Case 5 (Blank/Missing Admission Number): Rejected with row-level error.
+     - Case 6 (Historical Placement Preservation): Prior academic placements and marks remain preserved; historical records are never deleted or rewritten.
+  4. Partial imports are supported: valid rows are inserted; invalid rows are skipped with row-level error reporting.
+  5. Response returns a summary Blade view listing: total rows processed, successful insertions, and a table of rejected rows with exact validation failure reasons.
 
 ---
 

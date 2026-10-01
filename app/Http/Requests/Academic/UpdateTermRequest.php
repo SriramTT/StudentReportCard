@@ -9,7 +9,8 @@ class UpdateTermRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->isAdmin() || $this->user()?->isOfficeStaff();
+        $term = $this->route('term');
+        return $this->user()?->can('update', $term) ?? false;
     }
 
     public function rules(): array
@@ -28,14 +29,13 @@ class UpdateTermRequest extends FormRequest
                     ->ignore($termId),
             ],
             'sequence_no' => [
-                'required',
+                'nullable',
                 'integer',
                 'min:1',
                 Rule::unique('terms', 'sequence_no')
                     ->where('academic_year_id', $academicYearId)
                     ->ignore($termId),
             ],
-            'is_active' => ['nullable', 'boolean'],
         ];
     }
 }

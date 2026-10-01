@@ -39,4 +39,24 @@ class ReportConfiguration extends Model
     {
         return $this->hasMany(ReportAssessmentSelection::class, 'report_configuration_id');
     }
+
+    public function isMidTerm(): bool
+    {
+        return $this->report_type === ReportType::EXAM && ($this->configuration_data['subtype'] ?? null) === 'mid_term';
+    }
+
+    public function isCustom(): bool
+    {
+        return $this->report_type === ReportType::EXAM && (! isset($this->configuration_data['subtype']) || $this->configuration_data['subtype'] === 'custom');
+    }
+
+    public function getUserFacingTypeLabelAttribute(): string
+    {
+        return match ($this->report_type) {
+            ReportType::TERM => 'Term report card',
+            ReportType::FINAL => 'Final Annual Consolidated Report',
+            ReportType::EXAM => $this->isMidTerm() ? 'Mid term Assessments' : 'Custom Report',
+        };
+    }
 }
+

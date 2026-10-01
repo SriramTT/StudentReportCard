@@ -46,6 +46,11 @@ class Section extends Model
         return $this->hasMany(StudentAcademicRecord::class, 'section_id');
     }
 
+    public function academicRecords(): HasMany
+    {
+        return $this->hasMany(StudentAcademicRecord::class, 'section_id');
+    }
+
     public function teacherAssignments(): HasMany
     {
         return $this->hasMany(TeacherAssignment::class, 'section_id');

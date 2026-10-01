@@ -27,7 +27,7 @@ class SectionPolicy
         return $user->isAdmin() || $user->isOfficeStaff();
     }
 
-    public function delete(User $user, Section $section): bool
+    public function delete(User $user, ?Section $section = null): bool
     {
         return $user->isAdmin();
     }

@@ -52,4 +52,12 @@ class MarkPolicy
     {
         return $user->isAdmin() || $user->isOfficeStaff();
     }
+
+    /**
+     * Determine whether the user can batch save marks in a specific context.
+     */
+    public function batchSave(User $user, int $academicYearId, int $classId, int $sectionId, int $subjectId): bool
+    {
+        return $this->teacherAuth->userCanEditMarksInContext($user, $academicYearId, $classId, $sectionId, $subjectId);
+    }
 }

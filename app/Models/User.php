@@ -7,6 +7,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
+/**
+ * User model representing persistent administrative and academic users in school_report_card.
+ */
 class User extends Authenticatable
 {
     use Notifiable;
@@ -17,6 +20,10 @@ class User extends Authenticatable
         'username',
         'display_name',
         'email',
+        'role_id',
+        'is_active',
+        'password_hash',
+        'eligible_subject_ids',
     ];
 
     protected $hidden = [
@@ -90,10 +97,23 @@ class User extends Authenticatable
     {
         return [
             'is_active' => 'boolean',
+            'eligible_subject_ids' => 'array',
             'last_login_at' => 'immutable_datetime',
             'created_at' => 'immutable_datetime',
             'updated_at' => 'immutable_datetime',
         ];
+    }
+
+    /**
+     * Get the Subject collection representing this teacher's informational subject eligibility.
+     */
+    public function getEligibleSubjectsAttribute(): \Illuminate\Support\Collection
+    {
+        if (empty($this->eligible_subject_ids)) {
+            return collect();
+        }
+
+        return Subject::whereIn('id', $this->eligible_subject_ids)->orderBy('name')->get();
     }
 
     public function role(): BelongsTo

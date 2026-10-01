@@ -23,6 +23,25 @@ class SchoolClass extends Model
         ];
     }
 
+    /**
+     * Return classes ordered using human natural sorting (e.g. Class 1, Class 2, ... Class 10).
+     *
+     * @param bool $activeOnly
+     * @param array<int>|null $classIds
+     * @return \Illuminate\Support\Collection<int, SchoolClass>
+     */
+    public static function getNaturallySorted(bool $activeOnly = true, ?array $classIds = null): \Illuminate\Support\Collection
+    {
+        $query = static::query();
+        if ($activeOnly) {
+            $query->where('is_active', true);
+        }
+        if ($classIds !== null) {
+            $query->whereIn('id', $classIds);
+        }
+        return $query->get()->sortBy('name', SORT_NATURAL)->values();
+    }
+
     public function sections(): HasMany
     {
         return $this->hasMany(Section::class, 'class_id');
@@ -34,6 +53,11 @@ class SchoolClass extends Model
     }
 
     public function studentAcademicRecords(): HasMany
+    {
+        return $this->hasMany(StudentAcademicRecord::class, 'class_id');
+    }
+
+    public function academicRecords(): HasMany
     {
         return $this->hasMany(StudentAcademicRecord::class, 'class_id');
     }
